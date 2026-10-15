@@ -30,15 +30,18 @@ Then visit `http://localhost:8000`.
 - suite cards can be filtered by category or searched by text
 - the suite toolbar shows result counts, active filter state, and a reset control
 - visible metadata pills summarize each suite card's categories
+- visitors can sign an experience guestbook, tag which apps they tried, and react with upvotes/downvotes
 - keyboard shortcuts are available via `?`
 - ambient audio is optional, visitor-controlled, and lazily loads the YouTube player
-- SharkBoard stores posts in `localStorage`, so its content is browser-local rather than shared across devices
+- SharkBoard and the feedback guestbook store entries in `localStorage`, so their content is browser-local rather than shared across devices
 
 ## Maintenance notes
 
 - when adding a new suite card, keep its `data-tags` aligned with an available filter chip
+- guestbook app choices are derived from suite card titles in `script.js`, so changing a card title changes the available feedback labels too
 - if a new interaction is exposed in the UI, ensure the page actually loads the script that powers it
 - SharkBoard persistence is versioned in `script.js`; preserve the migration path from the legacy `sharkboard-posts` key unless intentionally removing it
+- guestbook persistence is versioned under `webshark-feedback-v1`; keep the payload shape stable unless you intentionally migrate it
 - ambient audio still depends on the global `window.onYouTubeIframeAPIReady` hook even though the API script now loads on demand
 
 

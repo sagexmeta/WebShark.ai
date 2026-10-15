@@ -1,6 +1,7 @@
 const STORAGE_KEYS = {
     audioUnmuted: 'webshark-audio-unmuted',
-    sharkboard: 'sharkboard-posts-v1'
+    sharkboard: 'sharkboard-posts-v1',
+    feedback: 'webshark-feedback-v1'
 };
 
 const LEGACY_STORAGE_KEYS = {
@@ -20,6 +21,7 @@ const TAG_LABELS = {
 };
 
 const MAX_SHARKBOARD_POSTS = 50;
+const MAX_FEEDBACK_ENTRIES = 75;
 const prefersReducedMotionEarly = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const prefersReducedMotion = prefersReducedMotionEarly;
 const prefersCoarsePointer = window.matchMedia('(pointer: coarse)').matches;
@@ -1259,7 +1261,232 @@ document.querySelectorAll('.shimmer-word').forEach((shimmerElement) => {
     renderPosts();
 })();
 
-// 16. Keyboard shortcuts overlay
+// 16. Experience feedback guestbook
+(function initExperienceGuestbook() {
+    const form = document.getElementById('feedback-form');
+    const nameInput = document.getElementById('feedback-name');
+    const ratingSelect = document.getElementById('feedback-rating');
+    const appsContainer = document.getElementById('feedback-apps');
+    const messageInput = document.getElementById('feedback-message');
+    const charCount = document.getElementById('feedback-char-count');
+    const submitButton = document.getElementById('feedback-submit');
+    const entriesContainer = document.getElementById('feedback-entries');
+    const summary = document.getElementById('feedback-summary');
+    if (!form || !nameInput || !ratingSelect || !appsContainer || !messageInput || !charCount || !submitButton || !entriesContainer || !summary) return;
+
+    const appNames = cards
+        .map((card) => card.querySelector('h3')?.textContent?.trim() || '')
+        .filter(Boolean);
+
+    let entries = loadEntries();
+
+    function slugify(text) {
+        return text
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '');
+    }
+
+    function buildAppOptions() {
+        appsContainer.innerHTML = appNames.map((appName) => {
+            const id = `feedback-app-${slugify(appName)}`;
+            return `
+                <div class="feedback-app-option">
+                    <input type="checkbox" id="${id}" value="${escapeHtml(appName)}">
+                    <label for="${id}">${escapeHtml(appName)}</label>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function getSelectedApps() {
+        return Array.from(appsContainer.querySelectorAll('input:checked')).map((input) => input.value);
+    }
+
+    function renderStars(rating) {
+        const safeRating = Math.max(1, Math.min(5, Number(rating) || 5));
+        return `${'★'.repeat(safeRating)}${'☆'.repeat(5 - safeRating)}`;
+    }
+
+    function normalizeEntry(rawEntry, index) {
+        if (!rawEntry || typeof rawEntry !== 'object') return null;
+
+        const message = typeof rawEntry.message === 'string'
+            ? rawEntry.message.trim().slice(0, 600)
+            : '';
+
+        if (!message) return null;
+
+        const apps = Array.isArray(rawEntry.apps)
+            ? rawEntry.apps
+                .map((app) => typeof app === 'string' ? app.trim().slice(0, 80) : '')
+                .filter(Boolean)
+                .slice(0, 6)
+            : [];
+
+        if (apps.length === 0) return null;
+
+        const upvotes = Number.isFinite(Number(rawEntry.upvotes)) ? Math.max(0, Math.floor(Number(rawEntry.upvotes))) : 0;
+        const downvotes = Number.isFinite(Number(rawEntry.downvotes)) ? Math.max(0, Math.floor(Number(rawEntry.downvotes))) : 0;
+        const userVote = [-1, 0, 1].includes(Number(rawEntry.userVote)) ? Number(rawEntry.userVote) : 0;
+
+        return {
+            id: Number.isFinite(Number(rawEntry.id)) ? Number(rawEntry.id) : Date.now() + index,
+            name: typeof rawEntry.name === 'string' && rawEntry.name.trim()
+                ? rawEntry.name.trim().slice(0, 40)
+                : 'Anonymous Visitor',
+            rating: Math.max(1, Math.min(5, Number(rawEntry.rating) || 5)),
+            apps,
+            message,
+            timestamp: typeof rawEntry.timestamp === 'string' && rawEntry.timestamp.trim()
+                ? rawEntry.timestamp.trim()
+                : new Date().toLocaleString(),
+            upvotes,
+            downvotes,
+            userVote
+        };
+    }
+
+    function persistEntries(nextEntries) {
+        safeWriteStorage(STORAGE_KEYS.feedback, JSON.stringify({
+            version: 1,
+            entries: nextEntries.slice(0, MAX_FEEDBACK_ENTRIES)
+        }));
+    }
+
+    function loadEntries() {
+        const stored = safeReadJSON(STORAGE_KEYS.feedback);
+        const source = Array.isArray(stored)
+            ? stored
+            : Array.isArray(stored?.entries)
+                ? stored.entries
+                : [];
+
+        const normalized = source
+            .map((entry, index) => normalizeEntry(entry, index))
+            .filter(Boolean)
+            .slice(0, MAX_FEEDBACK_ENTRIES);
+
+        persistEntries(normalized);
+        return normalized;
+    }
+
+    function updateFormState() {
+        charCount.textContent = String(messageInput.value.length);
+        const hasMessage = messageInput.value.trim().length > 0;
+        const hasApps = getSelectedApps().length > 0;
+        submitButton.disabled = !(hasMessage && hasApps);
+    }
+
+    function resetForm() {
+        form.reset();
+        ratingSelect.value = '5';
+        charCount.textContent = '0';
+        updateFormState();
+    }
+
+    function renderEntries() {
+        summary.textContent = `${entries.length} signed ${entries.length === 1 ? 'entry' : 'entries'}`;
+
+        if (entries.length === 0) {
+            entriesContainer.innerHTML = '<p class="feedback-empty">No signed feedback yet. Be the first visitor to log your experience.</p>';
+            return;
+        }
+
+        entriesContainer.innerHTML = entries.map((entry) => `
+            <article class="feedback-entry" data-entry-id="${entry.id}">
+                <div class="feedback-entry-header">
+                    <div class="feedback-entry-author">
+                        <strong>${escapeHtml(entry.name)}</strong>
+                        <span class="feedback-entry-date">${escapeHtml(entry.timestamp)}</span>
+                    </div>
+                    <span class="feedback-rating" aria-label="${entry.rating} out of 5 stars">${renderStars(entry.rating)}</span>
+                </div>
+                <div class="feedback-entry-apps">
+                    ${entry.apps.map((app) => `<span class="feedback-entry-app">${escapeHtml(app)}</span>`).join('')}
+                </div>
+                <p class="feedback-entry-message">${escapeHtml(entry.message)}</p>
+                <div class="feedback-entry-actions">
+                    <button type="button" class="feedback-vote-button ${entry.userVote === 1 ? 'is-active' : ''}" data-entry-id="${entry.id}" data-vote="1" aria-label="Upvote feedback">↑</button>
+                    <button type="button" class="feedback-vote-button ${entry.userVote === -1 ? 'is-active' : ''}" data-entry-id="${entry.id}" data-vote="-1" aria-label="Downvote feedback">↓</button>
+                    <span class="feedback-vote-count">${entry.upvotes} up / ${entry.downvotes} down</span>
+                </div>
+            </article>
+        `).join('');
+    }
+
+    function updateVote(entry, nextVote) {
+        if (entry.userVote === nextVote) {
+            if (nextVote === 1 && entry.upvotes > 0) entry.upvotes -= 1;
+            if (nextVote === -1 && entry.downvotes > 0) entry.downvotes -= 1;
+            entry.userVote = 0;
+            return;
+        }
+
+        if (entry.userVote === 1 && entry.upvotes > 0) entry.upvotes -= 1;
+        if (entry.userVote === -1 && entry.downvotes > 0) entry.downvotes -= 1;
+
+        if (nextVote === 1) entry.upvotes += 1;
+        if (nextVote === -1) entry.downvotes += 1;
+        entry.userVote = nextVote;
+    }
+
+    buildAppOptions();
+    renderEntries();
+    updateFormState();
+
+    appsContainer.addEventListener('change', updateFormState);
+    messageInput.addEventListener('input', updateFormState);
+
+    form.addEventListener('submit', (event) => {
+        event.preventDefault();
+
+        const message = messageInput.value.trim();
+        const apps = getSelectedApps();
+        if (!message || apps.length === 0) {
+            announceStatus('Choose at least one app and write feedback before signing the guestbook.');
+            updateFormState();
+            return;
+        }
+
+        const entry = normalizeEntry({
+            id: Date.now(),
+            name: nameInput.value.trim() || 'Anonymous Visitor',
+            rating: Number(ratingSelect.value) || 5,
+            apps,
+            message,
+            timestamp: new Date().toLocaleString(),
+            upvotes: 0,
+            downvotes: 0,
+            userVote: 0
+        }, 0);
+
+        entries.unshift(entry);
+        entries = entries.slice(0, MAX_FEEDBACK_ENTRIES);
+        persistEntries(entries);
+        renderEntries();
+        resetForm();
+        nameInput.focus();
+        announceStatus('Your guestbook feedback has been signed on this device.');
+    });
+
+    entriesContainer.addEventListener('click', (event) => {
+        const voteButton = event.target.closest('.feedback-vote-button');
+        if (!voteButton) return;
+
+        const entryId = Number(voteButton.dataset.entryId);
+        const nextVote = Number(voteButton.dataset.vote);
+        const entry = entries.find((item) => item.id === entryId);
+        if (!entry || ![-1, 1].includes(nextVote)) return;
+
+        updateVote(entry, nextVote);
+        persistEntries(entries);
+        renderEntries();
+        announceStatus(nextVote === 1 ? 'Feedback upvoted.' : 'Feedback downvoted.');
+    });
+})();
+
+// 17. Keyboard shortcuts overlay
 (function initKeyboardShortcuts() {
     const overlay = document.getElementById('shortcuts-overlay');
     const closeButton = document.getElementById('shortcuts-close');

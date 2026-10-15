@@ -184,6 +184,62 @@
                 <p><span class="shimmer-word">A quiet space to pause, reset, and rest for a moment.</span></p>
             </a>
         </section>
+
+        <section class="feedback-harbor reveal" id="feedback" aria-labelledby="feedback-title">
+            <div class="feedback-shell">
+                <div class="feedback-intro">
+                    <p class="feedback-kicker">Visitor guestbook</p>
+                    <h2 id="feedback-title">Tell WebShark what you tried and how it felt.</h2>
+                    <p>Sign the guestbook with the apps you explored, leave feedback for future visitors, and react to notes already on the board.</p>
+                    <p class="feedback-note">Feedback is stored in this browser right now, so signatures and votes stay on this device.</p>
+                </div>
+
+                <div class="feedback-layout">
+                    <form id="feedback-form" class="feedback-form">
+                        <div class="feedback-field">
+                            <label for="feedback-name">Digital signature</label>
+                            <input type="text" id="feedback-name" class="feedback-input" maxlength="40" placeholder="Anonymous Visitor">
+                        </div>
+
+                        <div class="feedback-field">
+                            <label for="feedback-rating">Overall experience</label>
+                            <select id="feedback-rating" class="feedback-select">
+                                <option value="5">5 - Excellent</option>
+                                <option value="4">4 - Strong</option>
+                                <option value="3">3 - Solid</option>
+                                <option value="2">2 - Rough</option>
+                                <option value="1">1 - Needs work</option>
+                            </select>
+                        </div>
+
+                        <fieldset class="feedback-field feedback-apps-field">
+                            <legend>Which app(s) did you try?</legend>
+                            <div id="feedback-apps" class="feedback-apps"></div>
+                        </fieldset>
+
+                        <div class="feedback-field">
+                            <label for="feedback-message">Your feedback</label>
+                            <textarea id="feedback-message" class="feedback-textarea" maxlength="600" placeholder="What worked? What should improve? What stood out?"></textarea>
+                            <div class="feedback-meta">
+                                <span id="feedback-char-count">0</span>/600
+                            </div>
+                        </div>
+
+                        <button type="submit" id="feedback-submit" class="feedback-submit">Sign the guestbook</button>
+                    </form>
+
+                    <div class="feedback-board">
+                        <div class="feedback-board-header">
+                            <h3>Visitor feedback</h3>
+                            <p id="feedback-summary" class="feedback-summary" role="status" aria-live="polite"></p>
+                        </div>
+                        <div id="feedback-entries" class="feedback-entries">
+                            <p class="feedback-empty">No signed feedback yet. Be the first visitor to log your experience.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
     </main>
 
     <footer>

@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Static single-page site for the WebShark.ai suite landing page. Three files, no build, no framework, no package manager:
 
 - `index.html` — markup, references `styles.css` and `script.js`.
-- `script.js` — vanilla JS, 16 numbered feature blocks (see below), runs top-to-bottom on load.
+- `script.js` — vanilla JS, 17 numbered feature blocks (see below), runs top-to-bottom on load.
 - `styles.css` — vanilla CSS, custom properties on `:root`, two `body::before/::after` background layers, plus a fixed `#cursor-glow`, `#bubble-field` canvas, and `#scroll-progress-bar`.
 
 There is no `package.json`, no bundler, no linter, no test framework, and no transpilation. Open `index.html` directly or serve the folder statically (e.g. `python -m http.server 8000`) — that is the entire dev loop.
@@ -28,7 +28,7 @@ Each entry in `.suite-grid` is an `<a class="card reveal" data-tags="...">` with
 
 Adding/removing a card means also updating the chip set in the same file if a new tag is needed. The card contract is read by `initCardMetadata`, `initSuiteSearch` (`script.js`), `initCardBiteFeedback`, and the IntersectionObserver-driven `.reveal` stagger.
 
-### `script.js` is organized as 16 numbered feature blocks
+### `script.js` is organized as 17 numbered feature blocks
 
 They are sequential, top-level statements (not a single IIFE), and several rely on DOM order — do not reorder without checking. In order:
 
@@ -47,7 +47,8 @@ They are sequential, top-level statements (not a single IIFE), and several rely 
 13. `initCardBiteFeedback` — `🦈` bite mark on click, 260ms delay before navigation.
 14. `initSharkSwarmEasterEgg` — triple-click the visitor badge within 900ms to spawn a swarm.
 15. `initSharkBoard` — browser-local SharkBoard panel backed by versioned `localStorage` plus focus management.
-16. `initKeyboardShortcuts` — shortcuts overlay plus `/`, `a`, `b`, `m`, and `g` sequences.
+16. `initExperienceGuestbook` — browser-local feedback guestbook with app tagging and up/down voting.
+17. `initKeyboardShortcuts` — shortcuts overlay plus `/`, `a`, `b`, `m`, and `g` sequences.
 
 `prefersReducedMotionEarly` is captured once at the top of the file and gates the more aggressive animations. `prefersReducedMotion` is currently aliased from it and is used for the lower-cost background effects.
 
@@ -78,6 +79,12 @@ When touching these, update both sides:
 - `script.js` still migrates from the legacy `sharkboard-posts` array key; preserve that migration path unless you explicitly remove support for older stored boards.
 - The toggle button should keep `aria-expanded` in sync with the panel state.
 - If future work reintroduces shared persistence, remove or rewrite the local-storage assumptions above instead of layering a second implementation beside them.
+
+### Experience guestbook
+
+- The guestbook is currently browser-local and persists entries in `localStorage` under the key `webshark-feedback-v1`.
+- Available app choices are derived from the live suite card titles, so renaming a card also renames the feedback option shown in the guestbook.
+- Entries support browser-local upvotes and downvotes; those vote states are stored alongside each entry payload.
 
 ### External links
 
