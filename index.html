@@ -3,17 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="WebShark.ai is a lightweight suite directory for business, IT, data, AI, research, and simulation tools.">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.youtube.com https://s.ytimg.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://api.counterapi.dev; frame-src https://www.youtube.com; media-src https:; font-src 'self' https: data:; object-src 'none'; base-uri 'self'; form-action 'self';">
     <title>WebShark | High-performance, lightweight, forever-free business, IT, and data management suite</title>
-    
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-
-    <div id="custom-shark-cursor">🦈</div>
-    <div id="cursor-glow"></div>
+    <div id="custom-shark-cursor" aria-hidden="true">🦈</div>
+    <div id="cursor-glow" aria-hidden="true"></div>
     <div id="ocean-currents" aria-hidden="true"></div>
-    <canvas id="bubble-field"></canvas>
-    <div id="scroll-progress-bar"></div>
+    <canvas id="bubble-field" aria-hidden="true"></canvas>
+    <div id="scroll-progress-bar" aria-hidden="true"></div>
+    <p id="app-status" class="sr-only" aria-live="polite" aria-atomic="true"></p>
 
     <header>
         <a href="#" class="logo">WebShark<span>.</span><span class="ai-glow">ai</span></a>
@@ -30,23 +31,31 @@
 
     <main>
         <section class="hero">
-            <div class="badge" id="visitor-badge">
-                Work doesn't have to bite. Use WebShark.ai now.
-            </div>
+            <button class="badge" id="visitor-badge" type="button" aria-pressed="false" aria-describedby="badge-hint">
+                <span id="visitor-badge-text">Work doesn't have to bite. Use WebShark.ai now.</span>
+            </button>
+            <p id="badge-hint" class="sr-only">Toggle shark cursor mode. Triple-click for the shark swarm easter egg.</p>
             <h1 class="hero-title">
-              AI integrated, unified operating model for today's <span class="shimmer-word">high-performance roles.</span>
+                AI integrated, unified operating model for today&apos;s <span class="shimmer-word">high-performance roles.</span>
             </h1>
-            <p>A suite of integrated platforms crafted to optimize collaboration, accelerate workflows, and surface actionable business, IT, data, and research insights.</p>
+            <p>Explore a streamlined collection of business, IT, data, AI, research, and simulation tools designed for fast discovery and focused work.</p>
             <button class="scroll-cue" id="scroll-cue" aria-label="Scroll to the suite">
-                <span>Dive into the collection</span>
+                <span>Explore the suite</span>
                 <span class="scroll-cue-arrow">⌄</span>
             </button>
         </section>
 
-        <section class="suite-grid" id="suite">
-            <div class="suite-search-wrap reveal">
-                <input type="text" id="suite-search" class="suite-search" placeholder="Search the collection by name or role..." aria-label="Search the suite">
+        <section class="suite-grid" id="suite" aria-labelledby="suite-title">
+            <div class="suite-toolbar reveal">
+                <h2 id="suite-title" class="suite-title">Explore the WebShark collection</h2>
+                <div class="suite-search-wrap">
+                    <input type="text" id="suite-search" class="suite-search" placeholder="Search by tool, role, or category..." aria-label="Search the suite" aria-describedby="suite-results suite-active-filter">
+                    <button type="button" id="suite-clear" class="suite-clear" hidden>Reset filters</button>
+                </div>
+                <p class="suite-results" id="suite-results" role="status" aria-live="polite"></p>
+                <p class="suite-active-filter" id="suite-active-filter"></p>
             </div>
+
             <div class="suite-chips reveal" id="suite-chips" role="group" aria-label="Filter by category">
                 <button type="button" class="chip is-active" data-tag="all" aria-pressed="true">All</button>
                 <button type="button" class="chip" data-tag="build" aria-pressed="false">Build</button>
@@ -58,125 +67,122 @@
                 <button type="button" class="chip" data-tag="risk" aria-pressed="false">Risk</button>
                 <button type="button" class="chip" data-tag="wellness" aria-pressed="false">Wellness</button>
             </div>
+
             <p class="suite-empty-state" id="suite-empty-state" hidden>Even a shark comes up empty-handed sometimes 🦈 — try a different search.</p>
-            
-            <a href="https://colesr.github.io/WebSharkUI/" class="card reveal" data-tags="build" style="text-decoration: none; color: inherit;">
+
+            <a href="https://colesr.github.io/WebSharkUI/" class="card reveal" data-tags="build">
                 <div class="card-icon">🎨</div>
                 <h3>WebShark UI</h3>
-                <p><span class="shimmer-word"> Collaborative, lightweight, high-performance web development IDE designed for rapid UI iteration.</span></p>
+                <p><span class="shimmer-word">Collaborative, lightweight UI development with rapid iteration built for the browser.</span></p>
             </a>
 
-            <a href="https://colesr.github.io/WebSharkDataStudio/" class="card reveal" data-tags="data research" style="text-decoration: none; color: inherit;">
+            <a href="https://colesr.github.io/WebSharkDataStudio/" class="card reveal" data-tags="data research">
                 <div class="card-icon">🧬</div>
                 <h3>WebShark Data Studio</h3>
-                <p><span class="shimmer-word"> A lightweight, high-performance workbench for data science. Data science workflows all in one place — your browser.</span></p>
+                <p><span class="shimmer-word">A high-performance browser workbench for data science and applied research workflows.</span></p>
             </a>
 
-            <a href="https://colesr.github.io/WebShark-Manager/" class="card reveal" data-tags="business" style="text-decoration: none; color: inherit;">
+            <a href="https://colesr.github.io/WebShark-Manager/" class="card reveal" data-tags="business">
                 <div class="card-icon">♟️</div>
                 <h3>WebShark Manager</h3>
-                <p><span class="shimmer-word">A simple and flexible business and IT portfolio management platform.</span></p>
+                <p><span class="shimmer-word">Flexible portfolio management for business operations, planning, and IT coordination.</span></p>
             </a>
-            
-            <a href="https://github.com/colesr/WebShark-Marimo-Copilot" class="card reveal" data-tags="ai data build" style="text-decoration: none; color: inherit;">
+
+            <a href="https://github.com/colesr/WebShark-Marimo-Copilot" class="card reveal" data-tags="ai data build">
                 <div class="card-icon">🤖</div>
                 <h3>WebShark Marimo Copilot</h3>
-                <p><span class="shimmer-word">A plan-first AI copilot for Marimo reactive data-science notebooks</span></p>
+                <p><span class="shimmer-word">A plan-first AI copilot for Marimo reactive data-science notebooks.</span></p>
             </a>
 
-            <a href="https://colesr.github.io/WebShark-LaborMarketSuite/" class="card reveal" data-tags="research data business" style="text-decoration: none; color: inherit;">
+            <a href="https://colesr.github.io/WebShark-LaborMarketSuite/" class="card reveal" data-tags="research data business">
                 <div class="card-icon">🛠️</div>
                 <h3>WebShark Labor Market Research</h3>
-                <p><span class="shimmer-word">Research and simulate labor market activity.</span></p>
+                <p><span class="shimmer-word">Research and simulate labor-market activity with lightweight browser-native tools.</span></p>
             </a>
 
-            <a href="https://colesr-insight-engine-docker.hf.space" class="card reveal" data-tags="research sim" style="text-decoration: none; color: inherit;">
+            <a href="https://colesr-insight-engine-docker.hf.space" class="card reveal" data-tags="research sim">
                 <div class="card-icon">🌍</div>
                 <h3>WebShark Global Insights</h3>
-                <p><span class="shimmer-word">Global research and event simulation platform.</span></p>
+                <p><span class="shimmer-word">Global research, scenario analysis, and event simulation in one workspace.</span></p>
             </a>
 
-            <a href="https://colesr.github.io/WebShark-Communication-Strategy/" class="card reveal" data-tags="business research ai" style="text-decoration: none; color: inherit;">
+            <a href="https://colesr.github.io/WebShark-Communication-Strategy/" class="card reveal" data-tags="business research ai">
                 <div class="card-icon">🗪</div>
                 <h3>WebShark Communication</h3>
-                <p><span class="shimmer-word">Communication analysis and strategy development.</span></p>
+                <p><span class="shimmer-word">Analyze messaging, shape strategy, and explore audience communication patterns.</span></p>
             </a>
 
-            <a href="https://colesr.github.io/Corr.ai/" class="card reveal" data-tags="data research" style="text-decoration: none; color: inherit;">
+            <a href="https://colesr.github.io/Corr.ai/" class="card reveal" data-tags="data research">
                 <div class="card-icon">🔀</div>
                 <h3>WebShark Correlation Engine</h3>
-                <p><span class="shimmer-word">Research platform that surfaces correlations and provides the tools for deep investigation workflows.</span></p>
+                <p><span class="shimmer-word">Surface correlations quickly and move into deeper investigation workflows.</span></p>
             </a>
 
-            <a href="https://colesr.github.io/reverie/" class="card reveal" data-tags="ai build" style="text-decoration: none; color: inherit;">
+            <a href="https://colesr.github.io/reverie/" class="card reveal" data-tags="ai build">
                 <div class="card-icon">🧠</div>
                 <h3>Reverie.ai</h3>
-                <p><span class="shimmer-word">Teachable Local Private AI + some helpful extras such as quick and easy file conversions.</span></p>
+                <p><span class="shimmer-word">Private local AI with lightweight file conversion and productivity extras.</span></p>
             </a>
 
-            <a href="https://webshark-email.pages.dev/" class="card reveal" data-tags="business build" style="text-decoration: none; color: inherit;">
+            <a href="https://webshark-email.pages.dev/" class="card reveal" data-tags="business build">
                 <div class="card-icon">📧</div>
                 <h3>WebShark Infinity Mail</h3>
-                <p><span class="shimmer-word">A complete yet minimalist email platform with unlimited account/inbox generation and use.</span></p>
+                <p><span class="shimmer-word">A minimalist email platform with unlimited inbox creation and everyday utility.</span></p>
             </a>
-            
-            <a href="https://colesr.github.io/WebShark-Library-AI/" class="card reveal" data-tags="research data ai" style="text-decoration: none; color: inherit;">
+
+            <a href="https://colesr.github.io/WebShark-Library-AI/" class="card reveal" data-tags="research data ai">
                 <div class="card-icon">🏛️</div>
                 <h3>WebShark Library.AI</h3>
-                <p><span class="shimmer-word">A Forever Free, One-Pass Ticket to the Universe of Data Resources.</span></p>
+                <p><span class="shimmer-word">A single-pass launch point for exploring broad, useful data resources.</span></p>
             </a>
 
-            <a href="https://colesr.github.io/thesea/" class="card reveal" data-tags="sim" style="text-decoration: none; color: inherit;">
+            <a href="https://colesr.github.io/thesea/" class="card reveal" data-tags="sim">
                 <div class="card-icon">🌊</div>
-                <h3>WebShark Seashore-Simulator</h3>
-                <p><span class="shimmer-word">Seashore-Simulator is a simple and realistic sandbox ecosystem survival app.</span></p>
+                <h3>WebShark Seashore Simulator</h3>
+                <p><span class="shimmer-word">A realistic sandbox ecosystem app for playful survival and environmental exploration.</span></p>
             </a>
 
-            <a href="https://colesr.github.io/RTH.db/" class="card reveal" data-tags="sim research" style="text-decoration: none; color: inherit;">
+            <a href="https://colesr.github.io/RTH.db/" class="card reveal" data-tags="sim research">
                 <div class="card-icon">🌐</div>
-                <h3>WebShark Nature-Simulator</h3>
-                <p><span class="shimmer-word">Nature-Simulator is an environmental systems simulation platform.</span></p>
+                <h3>WebShark Nature Simulator</h3>
+                <p><span class="shimmer-word">Model environmental systems and explore change through interactive simulation.</span></p>
             </a>
 
-            <a href="https://colesr.github.io/ArtistInfluence.ai/" class="card reveal" data-tags="research sim ai" style="text-decoration: none; color: inherit;">
+            <a href="https://colesr.github.io/ArtistInfluence.ai/" class="card reveal" data-tags="research sim ai">
                 <div class="card-icon">🕸️</div>
                 <h3>WebShark Influence Network</h3>
-                <p><span class="shimmer-word">Interactive influence mapping platform.</span></p>
+                <p><span class="shimmer-word">Map influence relationships and inspect interactive network patterns.</span></p>
             </a>
 
-            
-
-            <a href="https://colesr.github.io/rocks/" class="card reveal" data-tags="sim ai" style="text-decoration: none; color: inherit;">
+            <a href="https://colesr.github.io/rocks/" class="card reveal" data-tags="sim ai">
                 <div class="card-icon">💎</div>
                 <h3>WebShark Rocks</h3>
-                <p><span class="shimmer-word">The most advanced digital "sandbox" simulator in history, with AI-generated background music.</span></p>
+                <p><span class="shimmer-word">A deep digital sandbox simulator paired with AI-generated background music.</span></p>
             </a>
 
-            <a href="https://colesr.github.io/WebSharkPathways/" class="card reveal" data-tags="business" style="text-decoration: none; color: inherit;">
+            <a href="https://colesr.github.io/WebSharkPathways/" class="card reveal" data-tags="business">
                 <div class="card-icon">🧭</div>
                 <h3>WebShark Pathways</h3>
-                <p><span class="shimmer-word">Facilitates every aspect of the decision-making process.</span></p>
+                <p><span class="shimmer-word">Support structured decision-making from discovery to direction.</span></p>
             </a>
 
-            <a href="https://colesr.github.io/Oliver.AI/" class="card reveal" data-tags="sim ai" style="text-decoration: none; color: inherit;">
+            <a href="https://colesr.github.io/Oliver.AI/" class="card reveal" data-tags="sim ai">
                 <div class="card-icon">🛴</div>
-                <h3>Tribute to the legendary artist and comedic genius</h3>
-                <p><span class="shimmer-word">Pays respect to the late Oliver Tree by telling his story. Try the AI!</span></p>
+                <h3>Oliver.ai Tribute</h3>
+                <p><span class="shimmer-word">A story-driven tribute experience with an interactive AI companion.</span></p>
             </a>
-            
-             <a href="https://colesr.github.io/WebShark-Risk/" class="card reveal" data-tags="risk business ai" style="text-decoration: none; color: inherit;">
+
+            <a href="https://colesr.github.io/WebShark-Risk/" class="card reveal" data-tags="risk business ai">
                 <div class="card-icon">💵</div>
                 <h3>WebShark Risk</h3>
-                <p><span class="shimmer-word">AI integrated workbench executes all AML workflows, protecting your organization from financial risks and crimes.</span></p>
-            </a>           
+                <p><span class="shimmer-word">An AI-assisted AML workbench for protecting organizations from financial crime.</span></p>
+            </a>
 
-            
-             <a href="https://colesr.github.io/WebShark-Mind/" class="card reveal" data-tags="wellness" style="text-decoration: none; color: inherit;">
+            <a href="https://colesr.github.io/WebShark-Mind/" class="card reveal" data-tags="wellness">
                 <div class="card-icon">🌀</div>
                 <h3>WebShark Mind</h3>
-                <p><span class="shimmer-word">Pause a moment and rest.</span></p>
-            </a>  
-            
+                <p><span class="shimmer-word">A quiet space to pause, reset, and rest for a moment.</span></p>
+            </a>
         </section>
     </main>
 
@@ -197,29 +203,29 @@
 
     <div id="shark-swarm" aria-hidden="true"></div>
 
-    <button id="sharkboard-toggle" class="sharkboard-toggle" aria-label="Open SharkBoard" title="Open SharkBoard - Share & Create">
+    <button id="sharkboard-toggle" class="sharkboard-toggle" aria-label="Open SharkBoard" aria-controls="sharkboard-panel" aria-expanded="false" title="Open SharkBoard - Share & Create">
         <span class="sharkboard-icon">🎨</span>
     </button>
 
-    <div id="sharkboard-panel" class="sharkboard-panel" role="dialog" aria-modal="true" aria-labelledby="sharkboard-title" hidden>
+    <div id="sharkboard-panel" class="sharkboard-panel" role="dialog" aria-modal="true" aria-labelledby="sharkboard-title" aria-describedby="sharkboard-description" hidden>
         <div class="sharkboard-header">
             <h2 id="sharkboard-title">SharkBoard 🦈</h2>
-            <p class="sharkboard-subtitle">Share anything or modify works of art</p>
+            <p class="sharkboard-subtitle" id="sharkboard-description">Share short ideas, remix drafts, and keep creations in this browser.</p>
             <button type="button" class="sharkboard-close" id="sharkboard-close" aria-label="Close SharkBoard">×</button>
         </div>
-        
+
         <div class="sharkboard-content">
             <div class="sharkboard-section">
-                <h3>Share Your Creation</h3>
+                <h3>Share your creation</h3>
                 <textarea id="sharkboard-input" class="sharkboard-textarea" placeholder="What would you like to share with the ocean? 🌊" maxlength="500"></textarea>
                 <div class="sharkboard-input-info">
                     <span id="char-count">0</span>/500
                 </div>
-                <button type="button" id="sharkboard-submit" class="sharkboard-submit">Post to Board</button>
+                <button type="button" id="sharkboard-submit" class="sharkboard-submit">Post to board</button>
             </div>
 
             <div class="sharkboard-section">
-                <h3>Community Creations</h3>
+                <h3>Community creations</h3>
                 <div id="sharkboard-posts" class="sharkboard-posts">
                     <p class="sharkboard-empty">No posts yet. Be the first to share! 🎨</p>
                 </div>
@@ -227,10 +233,10 @@
         </div>
     </div>
 
-    <div id="shortcuts-overlay" class="overlay" hidden role="dialog" aria-modal="true" aria-labelledby="shortcuts-title">
-        <div class="overlay-card" role="document">
+    <div id="shortcuts-overlay" class="overlay" hidden role="dialog" aria-modal="true" aria-labelledby="shortcuts-title" aria-describedby="shortcuts-description">
+        <div class="overlay-card" role="document" tabindex="-1">
             <h2 id="shortcuts-title">Keyboard shortcuts</h2>
-            <p class="overlay-sub">Navigate WebShark without touching the mouse.</p>
+            <p class="overlay-sub" id="shortcuts-description">Navigate WebShark without touching the mouse.</p>
             <ul class="shortcut-list">
                 <li><kbd>?</kbd><span>Toggle this overlay</span></li>
                 <li><kbd>/</kbd><span>Focus the suite search</span></li>
@@ -245,7 +251,6 @@
         </div>
     </div>
 
-    <script src="https://www.youtube.com/iframe_api"></script>
     <script src="script.js"></script>
 </body>
 </html>

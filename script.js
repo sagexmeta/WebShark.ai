@@ -1,11 +1,202 @@
-// 0. Shared cursor position — used by block 5 (shark cursor) and block 7 (bubble trail).
-//    Single mousemove listener so the values are always current; the trail's spawn
-//    logic is gated on shark-cursor-mode, so the per-frame cost is one write.
-let _lastMouseX = null;
-let _lastMouseY = null;
-window.addEventListener('mousemove', (e) => {
-    _lastMouseX = e.clientX;
-    _lastMouseY = e.clientY;
+const STORAGE_KEYS = {
+    audioUnmuted: 'webshark-audio-unmuted',
+    sharkboard: 'sharkboard-posts-v1'
+};
+
+const LEGACY_STORAGE_KEYS = {
+    sharkboard: 'sharkboard-posts'
+};
+
+const TAG_LABELS = {
+    all: 'All',
+    ai: 'AI',
+    build: 'Build',
+    business: 'Business',
+    data: 'Data',
+    research: 'Research',
+    risk: 'Risk',
+    sim: 'Simulation',
+    wellness: 'Wellness'
+};
+
+const MAX_SHARKBOARD_POSTS = 50;
+const prefersReducedMotionEarly = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const prefersReducedMotion = prefersReducedMotionEarly;
+const prefersCoarsePointer = window.matchMedia('(pointer: coarse)').matches;
+const lowPowerMode = prefersCoarsePointer || ((navigator.hardwareConcurrency || 0) > 0 && navigator.hardwareConcurrency <= 4);
+const statusRegion = document.getElementById('app-status');
+const cards = Array.from(document.querySelectorAll('.card'));
+
+let _lastMouseX = window.innerWidth / 2;
+let _lastMouseY = window.innerHeight / 2;
+let statusAnnouncementFrame = 0;
+
+function announceStatus(message) {
+    if (!statusRegion || !message) return;
+    cancelAnimationFrame(statusAnnouncementFrame);
+    statusRegion.textContent = '';
+    statusAnnouncementFrame = requestAnimationFrame(() => {
+        statusRegion.textContent = message;
+    });
+}
+
+function safeReadStorage(key) {
+    try {
+        return localStorage.getItem(key);
+    } catch {
+        return null;
+    }
+}
+
+function safeWriteStorage(key, value) {
+    try {
+        localStorage.setItem(key, value);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+function safeRemoveStorage(key) {
+    try {
+        localStorage.removeItem(key);
+    } catch {
+        // Intentionally no-op. Storage is an enhancement, not a hard dependency.
+    }
+}
+
+function safeReadJSON(key) {
+    const raw = safeReadStorage(key);
+    if (!raw) return null;
+
+    try {
+        return JSON.parse(raw);
+    } catch {
+        return null;
+    }
+}
+
+function normalizeText(text) {
+    return (text || '')
+        .toLowerCase()
+        .normalize('NFKD')
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim();
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function getFocusableElements(container) {
+    if (!container) return [];
+
+    return Array.from(
+        container.querySelectorAll(
+            'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        )
+    ).filter((element) => !element.hasAttribute('hidden') && element.getAttribute('aria-hidden') !== 'true');
+}
+
+function createFocusTrap(container, { initialFocus, onEscape } = {}) {
+    let active = false;
+
+    function handleKeydown(event) {
+        if (!active) return;
+
+        if (event.key === 'Escape') {
+            if (typeof onEscape === 'function') {
+                event.preventDefault();
+                onEscape();
+            }
+            return;
+        }
+
+        if (event.key !== 'Tab') return;
+
+        const focusable = getFocusableElements(container);
+        if (focusable.length === 0) {
+            event.preventDefault();
+            return;
+        }
+
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+
+        if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+            return;
+        }
+
+        if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+        }
+    }
+
+    return {
+        activate() {
+            active = true;
+            document.addEventListener('keydown', handleKeydown);
+            requestAnimationFrame(() => {
+                const target = initialFocus?.() || getFocusableElements(container)[0] || container;
+                if (target && typeof target.focus === 'function') {
+                    target.focus();
+                }
+            });
+        },
+        deactivate() {
+            active = false;
+            document.removeEventListener('keydown', handleKeydown);
+        }
+    };
+}
+
+// 0. Shared pointer state
+const sharkCursor = document.getElementById('custom-shark-cursor');
+const pointerState = {
+    x: _lastMouseX,
+    y: _lastMouseY,
+    dirty: false
+};
+let pointerFrame = 0;
+let glowActivated = false;
+let isSharkMode = false;
+
+function flushPointerEffects() {
+    pointerFrame = 0;
+    pointerState.dirty = false;
+
+    if (isSharkMode && sharkCursor) {
+        sharkCursor.style.transform = `translate3d(${pointerState.x}px, ${pointerState.y}px, 0) translate(-50%, -50%)`;
+    }
+
+    if (!prefersReducedMotion) {
+        if (!glowActivated) {
+            document.body.classList.add('glow-active');
+            glowActivated = true;
+        }
+
+        document.documentElement.style.setProperty('--glow-x', `${pointerState.x}px`);
+        document.documentElement.style.setProperty('--glow-y', `${pointerState.y}px`);
+        document.documentElement.style.setProperty('--current-shift-x', `${(pointerState.x / window.innerWidth - 0.5) * 22}px`);
+        document.documentElement.style.setProperty('--current-shift-y', `${(pointerState.y / window.innerHeight - 0.5) * 18}px`);
+    }
+}
+
+window.addEventListener('mousemove', (event) => {
+    _lastMouseX = event.clientX;
+    _lastMouseY = event.clientY;
+    pointerState.x = event.clientX;
+    pointerState.y = event.clientY;
+    pointerState.dirty = true;
+
+    if (!pointerFrame) {
+        pointerFrame = requestAnimationFrame(flushPointerEffects);
+    }
 }, { passive: true });
 
 // 1. Shared Visitor Counter
@@ -33,10 +224,7 @@ window.addEventListener('mousemove', (e) => {
         .finally(() => window.clearTimeout(timeout));
 })();
 
-// 2. Dynamic Cursor Light Tracking + Subtle 3D Tilt
-const cards = document.querySelectorAll('.card');
-const prefersReducedMotionEarly = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
+// 2. Dynamic cursor light tracking + subtle 3D tilt
 function spawnSonarPing(card) {
     if (prefersReducedMotionEarly) return;
     const ping = document.createElement('span');
@@ -49,22 +237,24 @@ cards.forEach((card, index) => {
     card.style.setProperty('--card-phase', `${(index * 0.45).toFixed(2)}s`);
     card.style.setProperty('--card-icon-tilt', `${index % 2 === 0 ? 3 : -3}deg`);
 
-    card.addEventListener('mousemove', (e) => {
-        const rect = card.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
+    if (!prefersCoarsePointer) {
+        card.addEventListener('pointermove', (event) => {
+            const rect = card.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
 
-        card.style.setProperty('--mouse-x', `${x}px`);
-        card.style.setProperty('--mouse-y', `${y}px`);
+            card.style.setProperty('--mouse-x', `${x}px`);
+            card.style.setProperty('--mouse-y', `${y}px`);
 
-        if (!prefersReducedMotionEarly) {
-            const centerX = x - rect.width / 2;
-            const centerY = y - rect.height / 2;
-            const rotateY = (centerX / (rect.width / 2)) * 6;
-            const rotateX = -(centerY / (rect.height / 2)) * 6;
-            card.style.transform = `translateY(-6px) scale(1.01) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
-        }
-    });
+            if (!prefersReducedMotionEarly && !lowPowerMode) {
+                const centerX = x - rect.width / 2;
+                const centerY = y - rect.height / 2;
+                const rotateY = (centerX / (rect.width / 2)) * 6;
+                const rotateX = -(centerY / (rect.height / 2)) * 6;
+                card.style.transform = `translateY(-6px) scale(1.01) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+            }
+        }, { passive: true });
+    }
 
     card.addEventListener('mouseleave', () => {
         card.style.transform = '';
@@ -79,23 +269,42 @@ cards.forEach((card, index) => {
     });
 });
 
-// 3. Performance-Optimized Parallax Background on Scroll
-let scrollTimeout;
-window.addEventListener('scroll', () => {
-    if (!scrollTimeout) {
-        window.requestAnimationFrame(() => {
-            const depth = window.pageYOffset * 0.12;
-            document.body.style.setProperty('--scroll-y', `${depth}px`);
-            scrollTimeout = null;
-        });
-        scrollTimeout = true;
-    }
-}, { passive: true });
+// 3. Performance-optimized scroll effects
+(function initScrollEffects() {
+    const root = document.documentElement;
+    const backToTop = document.getElementById('back-to-top');
+    let frame = 0;
 
-// 4. Smooth Intersection Observer for Content Entry
+    function updateScrollEffects() {
+        frame = 0;
+        const scrollTop = window.pageYOffset;
+        const docHeight = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+        const progress = docHeight > 0 ? (scrollTop / docHeight) * 100 : 0;
+        const depth = scrollTop * 0.12;
+
+        document.body.style.setProperty('--scroll-y', `${depth}px`);
+        root.style.setProperty('--scroll-progress', `${progress}%`);
+
+        if (backToTop) {
+            backToTop.classList.toggle('visible', scrollTop > window.innerHeight * 0.6);
+        }
+    }
+
+    function requestUpdate() {
+        if (!frame) {
+            frame = requestAnimationFrame(updateScrollEffects);
+        }
+    }
+
+    window.addEventListener('scroll', requestUpdate, { passive: true });
+    window.addEventListener('resize', requestUpdate, { passive: true });
+    requestUpdate();
+})();
+
+// 4. Smooth intersection observer for content entry
 const revealElements = document.querySelectorAll('.reveal');
 const revealObserver = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
+    entries.forEach((entry) => {
         if (entry.isIntersecting) {
             entry.target.classList.add('active');
             revealObserver.unobserve(entry.target);
@@ -106,79 +315,66 @@ const revealObserver = new IntersectionObserver((entries) => {
     rootMargin: '0px 0px -50px 0px'
 });
 
-revealElements.forEach((el, index) => {
-    el.style.transitionDelay = `${index * 120}ms`;
-    revealObserver.observe(el);
+revealElements.forEach((element, index) => {
+    element.style.transitionDelay = `${index * 120}ms`;
+    revealObserver.observe(element);
 });
 
-// 5. Interactive Shark Badge & Custom Cursor State Engines
-const badge = document.getElementById('visitor-badge');
-const sharkCursor = document.getElementById('custom-shark-cursor');
-let isSharkMode = false;
+// 5. Interactive shark badge & custom cursor state engines
+(function initSharkMode() {
+    const badge = document.getElementById('visitor-badge');
+    const badgeText = document.getElementById('visitor-badge-text');
+    if (!badge || !badgeText) return;
 
-window.addEventListener('mousemove', (e) => {
-    if (isSharkMode) {
-        sharkCursor.style.transform = `translate3d(${e.clientX}px, ${e.clientY}px, 0) translate(-50%, -50%)`;
-    }
-});
+    function syncBadgeState() {
+        document.body.classList.toggle('shark-cursor-mode', isSharkMode);
+        badge.classList.toggle('shark-active', isSharkMode);
+        badge.setAttribute('aria-pressed', String(isSharkMode));
+        badge.setAttribute('aria-label', isSharkMode ? 'Disable shark cursor mode' : 'Enable shark cursor mode');
+        badgeText.textContent = isSharkMode
+            ? 'Swimming with the sharks is easy now.'
+            : 'Work doesn\'t have to bite. Use WebShark.ai now.';
 
-badge.addEventListener('click', (e) => {
-    e.stopPropagation();
-    isSharkMode = !isSharkMode;
-
-    if (isSharkMode) {
-        document.body.classList.add('shark-cursor-mode');
-        badge.classList.add('shark-active');
-        badge.textContent = "Swimming with the sharks is easy now.";
-    } else {
-        document.body.classList.remove('shark-cursor-mode');
-        badge.classList.remove('shark-active');
-        badge.textContent = "It takes bytes to do your work...";
-    }
-});
-
-window.addEventListener('mousedown', () => {
-    if (isSharkMode) {
-        sharkCursor.textContent = "😬";
-    }
-});
-
-window.addEventListener('mouseup', () => {
-    if (isSharkMode) {
-        sharkCursor.textContent = "🦈";
-    }
-});
-
-// 6. Cursor-Following Ambient Glow (adds a lively, interactive feel to the background)
-const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-if (!prefersReducedMotion) {
-    let glowActivated = false;
-    window.addEventListener('mousemove', (e) => {
-        if (!glowActivated) {
-            document.body.classList.add('glow-active');
-            glowActivated = true;
+        if (!isSharkMode && sharkCursor) {
+            sharkCursor.textContent = '🦈';
         }
-        document.documentElement.style.setProperty('--glow-x', `${e.clientX}px`);
-        document.documentElement.style.setProperty('--glow-y', `${e.clientY}px`);
-        document.documentElement.style.setProperty('--current-shift-x', `${(e.clientX / window.innerWidth - 0.5) * 22}px`);
-        document.documentElement.style.setProperty('--current-shift-y', `${(e.clientY / window.innerHeight - 0.5) * 18}px`);
-    }, { passive: true });
-}
+    }
 
-// 7. Ambient Rising Bubble Field — a tasteful, low-cost canvas animation for the ocean/shark theme.
-//    #1: while in shark-cursor-mode, a small wake of trail particles follows the mouse.
+    badge.addEventListener('click', (event) => {
+        event.stopPropagation();
+        isSharkMode = !isSharkMode;
+        syncBadgeState();
+        announceStatus(isSharkMode ? 'Shark cursor mode enabled.' : 'Shark cursor mode disabled.');
+    });
+
+    window.addEventListener('mousedown', () => {
+        if (isSharkMode && sharkCursor) {
+            sharkCursor.textContent = '😬';
+        }
+    });
+
+    window.addEventListener('mouseup', () => {
+        if (isSharkMode && sharkCursor) {
+            sharkCursor.textContent = '🦈';
+        }
+    });
+
+    syncBadgeState();
+})();
+
+// 6. Ambient rising bubble field
 (function initBubbleField() {
     const canvas = document.getElementById('bubble-field');
     if (!canvas || prefersReducedMotion) return;
 
     const ctx = canvas.getContext('2d');
-    let width, height, bubbles, motes, rafId;
+    let width;
+    let height;
+    let bubbles = [];
+    let motes = [];
+    let rafId = 0;
     let isVisible = true;
-
-    // #1 cursor trail state. Spawn is gated on the existing shark-mode class — when the
-    // visitor leaves shark mode the array is wiped so stale particles don't keep rendering.
-    const TRAIL_MAX = 12;
+    const trailMax = lowPowerMode ? 6 : 12;
     let trail = [];
     let lastTrailSpawn = 0;
 
@@ -188,9 +384,11 @@ if (!prefersReducedMotion) {
     }
 
     function createBubbles() {
-        const count = Math.min(36, Math.floor((width * height) / 45000));
-        bubbles = Array.from({ length: count }, () => spawnBubble(true));
-        const moteCount = Math.min(34, Math.floor((width * height) / 90000));
+        const bubbleDivisor = lowPowerMode ? 65000 : 45000;
+        const moteDivisor = lowPowerMode ? 120000 : 90000;
+        const bubbleCount = Math.min(lowPowerMode ? 18 : 36, Math.floor((width * height) / bubbleDivisor));
+        const moteCount = Math.min(lowPowerMode ? 18 : 34, Math.floor((width * height) / moteDivisor));
+        bubbles = Array.from({ length: bubbleCount }, () => spawnBubble(true));
         motes = Array.from({ length: moteCount }, () => spawnMote(true));
     }
 
@@ -224,7 +422,7 @@ if (!prefersReducedMotion) {
             x,
             y,
             radius: 1 + Math.random() * 2,
-            speed: 0.8 + Math.random() * 1.2,   // faster than ambient bubbles
+            speed: 0.8 + Math.random() * 1.2,
             drift: (Math.random() - 0.5) * 0.3,
             wobble: Math.random() * Math.PI * 2,
             opacity: 0.10 + Math.random() * 0.12,
@@ -236,78 +434,75 @@ if (!prefersReducedMotion) {
         ctx.clearRect(0, 0, width, height);
         const sharkMode = document.body.classList.contains('shark-cursor-mode');
 
-        // Spawn a trail particle ~every 30ms while shark mode is on. The cap of TRAIL_MAX
-        // keeps the wake short — older particles fall off the end as new ones arrive.
         if (sharkMode) {
             const now = performance.now();
-            if (now - lastTrailSpawn > 30 && _lastMouseX !== null) {
+            if (now - lastTrailSpawn > (lowPowerMode ? 60 : 30)) {
                 trail.push(spawnTrailParticle(_lastMouseX, _lastMouseY));
-                if (trail.length > TRAIL_MAX) trail.shift();
+                if (trail.length > trailMax) trail.shift();
                 lastTrailSpawn = now;
             }
         } else if (trail.length) {
-            // Clean up immediately on exit so we don't render stragglers.
             trail = [];
         }
 
-        // Ambient bubbles first (under the trail).
-        bubbles.forEach((b) => {
-            b.wobble += 0.01;
-            b.y -= b.speed;
-            b.x += b.drift + Math.sin(b.wobble) * 0.3;
+        bubbles.forEach((bubble) => {
+            bubble.wobble += 0.01;
+            bubble.y -= bubble.speed;
+            bubble.x += bubble.drift + Math.sin(bubble.wobble) * 0.3;
 
-            if (b.y + b.radius < 0) {
-                Object.assign(b, spawnBubble(false));
+            if (bubble.y + bubble.radius < 0) {
+                Object.assign(bubble, spawnBubble(false));
             }
 
             ctx.beginPath();
-            ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
-            ctx.strokeStyle = `rgba(56, 189, 248, ${b.opacity})`;
-            ctx.fillStyle = `rgba(56, 189, 248, ${b.opacity * 0.35})`;
+            ctx.arc(bubble.x, bubble.y, bubble.radius, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(56, 189, 248, ${bubble.opacity})`;
+            ctx.fillStyle = `rgba(56, 189, 248, ${bubble.opacity * 0.35})`;
             ctx.lineWidth = 1;
             ctx.fill();
             ctx.stroke();
         });
 
-        motes.forEach((m) => {
-            m.wobble += 0.015;
-            m.y -= m.speed;
-            m.x += m.drift + Math.sin(m.wobble) * 0.18;
+        motes.forEach((mote) => {
+            mote.wobble += 0.015;
+            mote.y -= mote.speed;
+            mote.x += mote.drift + Math.sin(mote.wobble) * 0.18;
 
-            if (m.y + m.radius < 0) {
-                Object.assign(m, spawnMote(false));
+            if (mote.y + mote.radius < 0) {
+                Object.assign(mote, spawnMote(false));
             }
 
-            const alpha = m.opacity * (0.65 + Math.sin(m.wobble) * 0.35);
+            const alpha = mote.opacity * (0.65 + Math.sin(mote.wobble) * 0.35);
             ctx.beginPath();
-            ctx.arc(m.x, m.y, m.radius, 0, Math.PI * 2);
+            ctx.arc(mote.x, mote.y, mote.radius, 0, Math.PI * 2);
             ctx.fillStyle = `rgba(125, 211, 252, ${alpha})`;
             ctx.shadowBlur = 16;
             ctx.shadowColor = `rgba(125, 211, 252, ${alpha})`;
             ctx.fill();
         });
+
         ctx.shadowBlur = 0;
 
-        // Trail particles on top. They age and fade so the wake dissolves naturally.
-        for (let i = trail.length - 1; i >= 0; i--) {
-            const t = trail[i];
-            t.wobble += 0.015;
-            t.y -= t.speed;
-            t.x += t.drift + Math.sin(t.wobble) * 0.25;
-            t.age += 1;
-            const fade = Math.max(0, 1 - t.age / 60); // ~1s lifetime at 60fps
-            const alpha = t.opacity * fade;
+        for (let index = trail.length - 1; index >= 0; index -= 1) {
+            const particle = trail[index];
+            particle.wobble += 0.015;
+            particle.y -= particle.speed;
+            particle.x += particle.drift + Math.sin(particle.wobble) * 0.25;
+            particle.age += 1;
+
+            const fade = Math.max(0, 1 - particle.age / 60);
+            const alpha = particle.opacity * fade;
 
             ctx.beginPath();
-            ctx.arc(t.x, t.y, t.radius, 0, Math.PI * 2);
+            ctx.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
             ctx.strokeStyle = `rgba(56, 189, 248, ${alpha})`;
             ctx.fillStyle = `rgba(56, 189, 248, ${alpha * 0.5})`;
             ctx.lineWidth = 1;
             ctx.fill();
             ctx.stroke();
 
-            if (t.y + t.radius < 0 || fade <= 0) {
-                trail.splice(i, 1);
+            if (particle.y + particle.radius < 0 || fade <= 0) {
+                trail.splice(index, 1);
             }
         }
 
@@ -335,38 +530,25 @@ if (!prefersReducedMotion) {
     draw();
 })();
 
-// Shimmer hover effect — attach to every .shimmer-word on the page
+// 7. Shimmer hover effect
 document.querySelectorAll('.shimmer-word').forEach((shimmerElement) => {
-  shimmerElement.addEventListener('mouseenter', () => {
-    shimmerElement.style.animationDuration = '1s';
-    shimmerElement.style.filter = 'drop-shadow(0 0 8px rgba(56, 189, 248, 0.6))';
-  });
+    shimmerElement.addEventListener('mouseenter', () => {
+        shimmerElement.style.animationDuration = '1s';
+        shimmerElement.style.filter = 'drop-shadow(0 0 8px rgba(56, 189, 248, 0.6))';
+    });
 
-  shimmerElement.addEventListener('mouseleave', () => {
-    shimmerElement.style.animationDuration = '3.5s';
-    shimmerElement.style.filter = 'none';
-  });
+    shimmerElement.addEventListener('mouseleave', () => {
+        shimmerElement.style.animationDuration = '3.5s';
+        shimmerElement.style.filter = 'none';
+    });
 });
 
-// 8. Scroll Progress Bar — fills like a rising water level as the user scrolls
-(function initScrollProgress() {
-    const bar = document.documentElement;
-    function updateProgress() {
-        const scrollTop = window.pageYOffset;
-        const docHeight = document.documentElement.scrollHeight - window.innerHeight;
-        const progress = docHeight > 0 ? (scrollTop / docHeight) * 100 : 0;
-        bar.style.setProperty('--scroll-progress', `${progress}%`);
-    }
-    window.addEventListener('scroll', updateProgress, { passive: true });
-    window.addEventListener('resize', updateProgress, { passive: true });
-    updateProgress();
-})();
-
-// 9. Scroll Cue — clicking scrolls smoothly to the suite grid, and it hides once scrolled past
+// 8. Scroll cue
 (function initScrollCue() {
     const cue = document.getElementById('scroll-cue');
     const suite = document.getElementById('suite');
-    if (!cue || !suite) return;
+    const hero = document.querySelector('.hero');
+    if (!cue || !suite || !hero) return;
 
     cue.addEventListener('click', () => {
         suite.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -378,45 +560,91 @@ document.querySelectorAll('.shimmer-word').forEach((shimmerElement) => {
             cue.style.pointerEvents = entry.isIntersecting ? 'auto' : 'none';
         });
     }, { threshold: 0.3 });
-    cueObserver.observe(document.querySelector('.hero'));
+
+    cueObserver.observe(hero);
 })();
 
-// 10. Back-to-Surface Button — appears once you've scrolled past the hero
+// 9. Back-to-surface button
 (function initBackToTop() {
     const button = document.getElementById('back-to-top');
     if (!button) return;
-
-    window.addEventListener('scroll', () => {
-        button.classList.toggle('visible', window.pageYOffset > window.innerHeight * 0.6);
-    }, { passive: true });
 
     button.addEventListener('click', () => {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     });
 })();
 
-// 11. Live Search/Filter for the Suite Grid (with URL state sync)
+// 10. Visible suite metadata
+(function initCardMetadata() {
+    cards.forEach((card) => {
+        const tags = (card.dataset.tags || '')
+            .split(/\s+/)
+            .map((tag) => tag.trim().toLowerCase())
+            .filter(Boolean);
+
+        if (tags.length === 0) return;
+
+        const meta = document.createElement('div');
+        meta.className = 'card-meta';
+
+        tags.forEach((tag) => {
+            const pill = document.createElement('span');
+            pill.className = 'card-pill';
+            pill.textContent = TAG_LABELS[tag] || tag;
+            meta.appendChild(pill);
+        });
+
+        const externalPill = document.createElement('span');
+        externalPill.className = 'card-pill card-pill-external';
+        externalPill.textContent = 'External app';
+        meta.appendChild(externalPill);
+
+        const title = card.querySelector('h3');
+        if (title) {
+            title.insertAdjacentElement('beforebegin', meta);
+        } else {
+            card.appendChild(meta);
+        }
+    });
+})();
+
+// 11. Live search/filter for the suite grid (with URL state sync)
 (function initSuiteSearch() {
     const input = document.getElementById('suite-search');
     const emptyState = document.getElementById('suite-empty-state');
     const chipsContainer = document.getElementById('suite-chips');
+    const results = document.getElementById('suite-results');
+    const activeFilterSummary = document.getElementById('suite-active-filter');
+    const clearButton = document.getElementById('suite-clear');
     const suiteCards = Array.from(document.querySelectorAll('.suite-grid .card'));
-    if (!input) return;
+    if (!input || !chipsContainer || !results || !activeFilterSummary || !clearButton) return;
 
-    const chips = chipsContainer
-        ? Array.from(chipsContainer.querySelectorAll('.chip'))
-        : [];
+    const chips = Array.from(chipsContainer.querySelectorAll('.chip'));
     const validTags = new Set(chips.map((chip) => chip.dataset.tag).filter(Boolean));
     let activeTag = 'all';
-    let suppressUrlWrite = false; // skip the URL push while we're applying URL state on init
+    let suppressUrlWrite = false;
 
-    // URL state — kept inline here; will be promoted to features/urlstate.js when #15 ships.
+    const indexedCards = suiteCards.map((card) => {
+        const rawTags = (card.dataset.tags || '')
+            .split(/\s+/)
+            .map((tag) => tag.trim().toLowerCase())
+            .filter(Boolean);
+
+        return {
+            card,
+            rawTags,
+            normalizedName: normalizeText(card.querySelector('h3')?.textContent || ''),
+            normalizedDescription: normalizeText(card.querySelector('p')?.textContent || ''),
+            normalizedTags: normalizeText(rawTags.join(' '))
+        };
+    });
+
     function buildURL(query, tag) {
         const params = new URLSearchParams();
         if (query) params.set('q', query);
         if (tag && tag !== 'all') params.set('tag', tag);
-        const qs = params.toString();
-        return qs ? `${location.pathname}?${qs}` : location.pathname;
+        const queryString = params.toString();
+        return queryString ? `${location.pathname}?${queryString}` : location.pathname;
     }
 
     function readURLState() {
@@ -431,187 +659,316 @@ document.querySelectorAll('.shimmer-word').forEach((shimmerElement) => {
         return validTags.has(tag) ? tag : 'all';
     }
 
+    function syncChipsToTag(tag) {
+        chips.forEach((chip) => {
+            const isActive = chip.dataset.tag === tag;
+            chip.classList.toggle('is-active', isActive);
+            chip.setAttribute('aria-pressed', String(isActive));
+        });
+    }
+
     function writeURL() {
         const query = input.value.trim();
         const url = buildURL(query, activeTag);
-        // replaceState avoids polluting the browser history on every keystroke.
-        if (url !== location.pathname + location.search) {
+        if (url !== `${location.pathname}${location.search}`) {
             history.replaceState(null, '', url);
         }
     }
 
-    function applyFilters() {
-        const query = input.value.trim().toLowerCase();
+    function updateSummaries(visibleCount, totalCount) {
+        const query = input.value.trim();
+        const tagLabel = TAG_LABELS[activeTag] || activeTag;
+
+        results.textContent = `Showing ${visibleCount} of ${totalCount} tools`;
+
+        if (query && activeTag !== 'all') {
+            activeFilterSummary.textContent = `Active filters: "${query}" in ${tagLabel}`;
+        } else if (query) {
+            activeFilterSummary.textContent = `Active search: "${query}"`;
+        } else if (activeTag !== 'all') {
+            activeFilterSummary.textContent = `Active category: ${tagLabel}`;
+        } else {
+            activeFilterSummary.textContent = 'Browsing the full collection';
+        }
+
+        clearButton.hidden = !(query || activeTag !== 'all');
+    }
+
+    function applyFilters({ announce = false } = {}) {
+        const normalizedQuery = normalizeText(input.value);
         let visibleCount = 0;
 
-        suiteCards.forEach((card) => {
-            const name = card.querySelector('h3')?.textContent.toLowerCase() || '';
-            const desc = card.querySelector('p')?.textContent.toLowerCase() || '';
-            const tags = (card.dataset.tags || '').toLowerCase();
-            const matchesQuery = !query || name.includes(query) || desc.includes(query) || tags.includes(query);
-            const matchesTag = activeTag === 'all' || tags.split(/\s+/).includes(activeTag);
+        indexedCards.forEach((entry) => {
+            const matchesQuery = !normalizedQuery
+                || entry.normalizedName.includes(normalizedQuery)
+                || entry.normalizedDescription.includes(normalizedQuery)
+                || entry.normalizedTags.includes(normalizedQuery);
+            const matchesTag = activeTag === 'all' || entry.rawTags.includes(activeTag);
             const visible = matchesQuery && matchesTag;
-            card.classList.toggle('filtered-out', !visible);
-            if (visible) visibleCount += 1;
+
+            entry.card.classList.toggle('filtered-out', !visible);
+            entry.card.setAttribute('aria-hidden', String(!visible));
+
+            if (visible) {
+                visibleCount += 1;
+            }
         });
 
         if (emptyState) {
             emptyState.hidden = visibleCount !== 0;
         }
-    }
 
-    function syncChipsToTag(tag) {
-        chips.forEach((c) => {
-            const isActive = c.dataset.tag === tag;
-            c.classList.toggle('is-active', isActive);
-            c.setAttribute('aria-pressed', String(isActive));
-        });
-    }
+        updateSummaries(visibleCount, indexedCards.length);
 
-    // Apply URL state on init, before the first filter pass.
-    {
-        const initial = readURLState();
-        if (initial.query) input.value = initial.query;
-        activeTag = normalizeTag(initial.tag);
-        if (activeTag !== 'all') {
-            syncChipsToTag(activeTag);
+        if (announce) {
+            announceStatus(`Suite filters updated. ${visibleCount} tools available.`);
         }
-        suppressUrlWrite = true;
-        applyFilters();
-        suppressUrlWrite = false;
     }
+
+    function resetFilters({ announce = false } = {}) {
+        input.value = '';
+        activeTag = 'all';
+        syncChipsToTag(activeTag);
+        applyFilters({ announce });
+        if (!suppressUrlWrite) writeURL();
+    }
+
+    const initial = readURLState();
+    if (initial.query) input.value = initial.query;
+    activeTag = normalizeTag(initial.tag);
+    syncChipsToTag(activeTag);
+    suppressUrlWrite = true;
+    applyFilters();
+    suppressUrlWrite = false;
 
     input.addEventListener('input', () => {
         applyFilters();
         if (!suppressUrlWrite) writeURL();
     });
 
-    if (chipsContainer) {
-        chipsContainer.addEventListener('click', (e) => {
-            const chip = e.target.closest('.chip');
-            if (!chip || !chipsContainer.contains(chip)) return;
-            activeTag = normalizeTag(chip.dataset.tag || 'all');
-            syncChipsToTag(activeTag);
-            applyFilters();
-            if (!suppressUrlWrite) writeURL();
-        });
-    }
+    chipsContainer.addEventListener('click', (event) => {
+        const chip = event.target.closest('.chip');
+        if (!chip || !chipsContainer.contains(chip)) return;
+
+        activeTag = normalizeTag(chip.dataset.tag || 'all');
+        syncChipsToTag(activeTag);
+        applyFilters({ announce: true });
+        if (!suppressUrlWrite) writeURL();
+    });
+
+    clearButton.addEventListener('click', () => {
+        resetFilters({ announce: true });
+        input.focus();
+    });
+
+    window.addEventListener('popstate', () => {
+        const state = readURLState();
+        input.value = state.query;
+        activeTag = normalizeTag(state.tag);
+        syncChipsToTag(activeTag);
+        applyFilters();
+    });
 })();
 
-// 12. Optional Ambient Background Audio (YouTube IFrame API), muted by default
+// 12. Optional ambient background audio
 (function initAmbientAudio() {
     const toggle = document.getElementById('audio-toggle');
     const icon = toggle ? toggle.querySelector('.audio-icon') : null;
     if (!toggle) return;
 
-    const STORAGE_KEY = 'webshark-audio-unmuted';
     let player = null;
     let playerReady = false;
-    // On by default — only stays muted if the visitor explicitly muted it before.
-    let wantsUnmuted = localStorage.getItem(STORAGE_KEY) !== 'false';
+    let apiPromise = null;
+    let playerInitPromise = null;
+    let wantsUnmuted = safeReadStorage(STORAGE_KEYS.audioUnmuted) !== 'false';
     let autoplayEngaged = false;
 
-    function setToggleState(unmuted) {
+    function setToggleState(unmuted, loading = false) {
         toggle.setAttribute('aria-pressed', String(unmuted));
+
+        if (loading) {
+            toggle.title = 'Ambient audio: loading';
+            if (icon) icon.textContent = '⏳';
+            return;
+        }
+
         toggle.title = unmuted ? 'Ambient audio: playing (click to mute)' : 'Ambient audio: muted (click to play)';
         if (icon) icon.textContent = unmuted ? '🔊' : '🔇';
     }
 
-    const engageEvents = ['click', 'keydown', 'touchstart', 'scroll'];
-
     function stopListeningForEngagement() {
-        engageEvents.forEach((evt) => document.removeEventListener(evt, tryEngageAutoplay));
-    }
-
-    function tryEngageAutoplay() {
-        // Not ready yet, or nothing to do — leave the listeners in place to retry
-        // on the next interaction rather than giving up after the first attempt.
-        if (autoplayEngaged || !wantsUnmuted || !player || !playerReady) return;
-
-        player.unMute();
-        player.playVideo();
-        autoplayEngaged = true;
-        setToggleState(true);
-        stopListeningForEngagement();
-    }
-
-    // Most browsers refuse unmuted autoplay until the visitor has interacted with
-    // the page at all, so the player always starts muted (which is always allowed)
-    // and gets unmuted the instant a real interaction happens — making music-on-
-    // by-default work in practice as soon as the visitor does anything on the page.
-    engageEvents.forEach((evt) => {
-        document.addEventListener(evt, tryEngageAutoplay, { passive: true });
-    });
-
-    window.onYouTubeIframeAPIReady = function onYouTubeIframeAPIReady() {
-        player = new YT.Player('yt-audio-player', {
-            videoId: 'vIDr8ZnCLQw',
-            playerVars: {
-                autoplay: 1,
-                mute: 1,
-                loop: 1,
-                playlist: 'vIDr8ZnCLQw',
-                controls: 0,
-                disablekb: 1,
-                fs: 0,
-                modestbranding: 1
-            },
-            events: {
-                onReady: () => {
-                    playerReady = true;
-                    player.playVideo();
-                    if (wantsUnmuted) {
-                        // If the browser already allows unmuted autoplay (e.g. the
-                        // visitor has a high media engagement score on this site),
-                        // this succeeds immediately; otherwise the interaction
-                        // listeners above will unmute on the first gesture.
-                        tryEngageAutoplay();
-                    }
-                }
-            }
+        ['click', 'keydown', 'touchstart', 'scroll'].forEach((eventName) => {
+            document.removeEventListener(eventName, handlePotentialEngagement);
         });
-    };
+    }
 
-    toggle.addEventListener('click', () => {
-        if (!playerReady || !player) return;
-        wantsUnmuted = !wantsUnmuted;
-        autoplayEngaged = wantsUnmuted;
-        localStorage.setItem(STORAGE_KEY, String(wantsUnmuted));
-        // The visitor has now explicitly chosen a state — no need to keep
-        // listening for a later interaction to auto-engage playback.
-        stopListeningForEngagement();
+    function ensureYouTubeAPI() {
+        if (window.YT && typeof window.YT.Player === 'function') {
+            return Promise.resolve(window.YT);
+        }
+
+        if (apiPromise) return apiPromise;
+
+        apiPromise = new Promise((resolve, reject) => {
+            window.onYouTubeIframeAPIReady = function onYouTubeIframeAPIReady() {
+                resolve(window.YT);
+            };
+
+            if (document.querySelector('script[data-yt-api="true"]')) {
+                return;
+            }
+
+            const script = document.createElement('script');
+            script.src = 'https://www.youtube.com/iframe_api';
+            script.async = true;
+            script.dataset.ytApi = 'true';
+            script.onerror = () => reject(new Error('Unable to load YouTube IFrame API'));
+            document.head.appendChild(script);
+        });
+
+        return apiPromise;
+    }
+
+    function ensurePlayer() {
+        if (playerReady && player) {
+            return Promise.resolve(player);
+        }
+
+        if (playerInitPromise) return playerInitPromise;
+
+        setToggleState(wantsUnmuted, true);
+
+        playerInitPromise = ensureYouTubeAPI()
+            .then(() => new Promise((resolve) => {
+                player = new YT.Player('yt-audio-player', {
+                    videoId: 'vIDr8ZnCLQw',
+                    playerVars: {
+                        autoplay: 1,
+                        mute: 1,
+                        loop: 1,
+                        playlist: 'vIDr8ZnCLQw',
+                        controls: 0,
+                        disablekb: 1,
+                        fs: 0,
+                        modestbranding: 1
+                    },
+                    events: {
+                        onReady: () => {
+                            playerReady = true;
+                            player.playVideo();
+                            resolve(player);
+                        }
+                    }
+                });
+            }))
+            .catch((error) => {
+                apiPromise = null;
+                playerInitPromise = null;
+                playerReady = false;
+                player = null;
+                wantsUnmuted = false;
+                safeWriteStorage(STORAGE_KEYS.audioUnmuted, 'false');
+                setToggleState(false, false);
+                announceStatus('Ambient audio is unavailable right now.');
+                throw error;
+            });
+
+        return playerInitPromise;
+    }
+
+    function syncAudioState() {
+        if (!playerReady || !player) {
+            setToggleState(wantsUnmuted, false);
+            return;
+        }
 
         if (wantsUnmuted) {
             player.unMute();
             player.playVideo();
+            autoplayEngaged = true;
         } else {
             player.mute();
+            if (typeof player.pauseVideo === 'function') {
+                player.pauseVideo();
+            }
+            autoplayEngaged = false;
         }
-        setToggleState(wantsUnmuted);
+
+        setToggleState(wantsUnmuted, false);
+    }
+
+    function handlePotentialEngagement() {
+        if (autoplayEngaged || !wantsUnmuted) return;
+
+        ensurePlayer()
+            .then(() => {
+                if (!playerReady || !player || !wantsUnmuted) return;
+                player.unMute();
+                player.playVideo();
+                autoplayEngaged = true;
+                setToggleState(true, false);
+                stopListeningForEngagement();
+            })
+            .catch(() => {
+                stopListeningForEngagement();
+            });
+    }
+
+    if (wantsUnmuted) {
+        ['click', 'keydown', 'touchstart', 'scroll'].forEach((eventName) => {
+            document.addEventListener(eventName, handlePotentialEngagement, { passive: true });
+        });
+    }
+
+    toggle.addEventListener('click', () => {
+        wantsUnmuted = !wantsUnmuted;
+        safeWriteStorage(STORAGE_KEYS.audioUnmuted, String(wantsUnmuted));
+
+        if (wantsUnmuted) {
+            ensurePlayer()
+                .then(() => {
+                    syncAudioState();
+                    stopListeningForEngagement();
+                    announceStatus('Ambient audio on.');
+                })
+                .catch(() => {
+                    // Error path already announced in ensurePlayer.
+                });
+            return;
+        }
+
+        stopListeningForEngagement();
+        syncAudioState();
+        announceStatus('Ambient audio muted.');
     });
+
+    setToggleState(wantsUnmuted, false);
 })();
 
-// 13. Shark Bite Click Feedback on Cards
+// 13. Shark bite click feedback on cards
 (function initCardBiteFeedback() {
     if (prefersReducedMotionEarly) return;
-    const suiteCards = document.querySelectorAll('.suite-grid .card');
 
-    suiteCards.forEach((card) => {
-        card.addEventListener('click', (e) => {
+    cards.forEach((card) => {
+        card.addEventListener('click', (event) => {
             const href = card.getAttribute('href');
             if (href) {
-                e.preventDefault();
+                event.preventDefault();
             }
 
             card.classList.add('bite-active');
+            window.setTimeout(() => card.classList.remove('bite-active'), 400);
 
             const bite = document.createElement('span');
             bite.className = 'bite-mark';
             bite.textContent = '🦈';
             const rect = card.getBoundingClientRect();
-            bite.style.left = `${e.clientX - rect.left - 12}px`;
-            bite.style.top = `${e.clientY - rect.top - 12}px`;
+            const clientX = Number.isFinite(event.clientX) && event.clientX !== 0 ? event.clientX : rect.left + rect.width / 2;
+            const clientY = Number.isFinite(event.clientY) && event.clientY !== 0 ? event.clientY : rect.top + rect.height / 2;
+            bite.style.left = `${clientX - rect.left - 12}px`;
+            bite.style.top = `${clientY - rect.top - 12}px`;
             card.appendChild(bite);
+            bite.addEventListener('animationend', () => bite.remove(), { once: true });
 
             if (href) {
                 setTimeout(() => {
@@ -622,8 +979,9 @@ document.querySelectorAll('.shimmer-word').forEach((shimmerElement) => {
     });
 })();
 
-// 14. Shark Swarm Easter Egg — triple-click the badge to send sharks swimming across the screen
+// 14. Shark swarm easter egg
 (function initSharkSwarmEasterEgg() {
+    const badge = document.getElementById('visitor-badge');
     const swarmContainer = document.getElementById('shark-swarm');
     if (!badge || !swarmContainer || prefersReducedMotionEarly) return;
 
@@ -631,25 +989,27 @@ document.querySelectorAll('.shimmer-word').forEach((shimmerElement) => {
 
     badge.addEventListener('click', () => {
         const now = Date.now();
-        clickTimes = clickTimes.filter((t) => now - t < 900);
+        clickTimes = clickTimes.filter((timestamp) => now - timestamp < 900);
         clickTimes.push(now);
 
         if (clickTimes.length >= 3) {
             clickTimes = [];
+            announceStatus('Shark swarm released.');
             spawnSharkSwarm();
         }
     });
 
     function spawnSharkSwarm() {
         const count = 6;
-        for (let i = 0; i < count; i += 1) {
+
+        for (let index = 0; index < count; index += 1) {
             const shark = document.createElement('span');
             shark.className = 'swarm-shark';
             shark.textContent = '🦈';
             shark.style.top = `${10 + Math.random() * 70}%`;
             shark.style.left = '-80px';
             const duration = 2.5 + Math.random() * 1.5;
-            const delay = i * 120;
+            const delay = index * 120;
             shark.style.animationDuration = `${duration}s`;
             shark.style.animationDelay = `${delay}ms`;
             swarmContainer.appendChild(shark);
@@ -658,91 +1018,84 @@ document.querySelectorAll('.shimmer-word').forEach((shimmerElement) => {
     }
 })();
 
-// 15. SharkBoard Panel Management
+// 15. SharkBoard panel management
 (function initSharkBoard() {
     const toggle = document.getElementById('sharkboard-toggle');
     const panel = document.getElementById('sharkboard-panel');
-    const closeBtn = document.getElementById('sharkboard-close');
-    const submitBtn = document.getElementById('sharkboard-submit');
+    const closeButton = document.getElementById('sharkboard-close');
+    const submitButton = document.getElementById('sharkboard-submit');
     const textarea = document.getElementById('sharkboard-input');
     const charCount = document.getElementById('char-count');
     const postsContainer = document.getElementById('sharkboard-posts');
-    
-    if (!toggle || !panel || !closeBtn || !submitBtn || !textarea || !charCount || !postsContainer) return;
+    if (!toggle || !panel || !closeButton || !submitButton || !textarea || !charCount || !postsContainer) return;
 
-    const STORAGE_KEY = 'sharkboard-posts';
-    let posts = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-
-    function savePosts() {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(posts));
-    }
-
-    function openPanel() {
-        panel.hidden = false;
-        toggle.setAttribute('aria-expanded', 'true');
-        renderPosts();
-        requestAnimationFrame(() => textarea.focus());
-    }
-
-    function closePanel({ returnFocus = true } = {}) {
-        if (panel.hidden) return;
-        panel.hidden = true;
-        toggle.setAttribute('aria-expanded', 'false');
-        if (returnFocus) {
-            toggle.focus();
-        }
-    }
-
-    // Update character count
-    textarea.addEventListener('input', () => {
-        charCount.textContent = textarea.value.length;
+    let lastFocusedElement = null;
+    let posts = loadPosts();
+    const trap = createFocusTrap(panel, {
+        initialFocus: () => textarea,
+        onEscape: () => closePanel()
     });
 
-    // Toggle panel
-    toggle.addEventListener('click', () => {
-        if (panel.hidden) {
-            openPanel();
-            return;
-        }
+    function normalizePost(rawPost, index) {
+        if (!rawPost || typeof rawPost !== 'object') return null;
 
-        closePanel({ returnFocus: false });
-    });
+        const content = typeof rawPost.content === 'string'
+            ? rawPost.content.trim().slice(0, 500)
+            : '';
 
-    // Close panel
-    closeBtn.addEventListener('click', () => {
-        closePanel();
-    });
+        if (!content) return null;
 
-    // Close on backdrop click
-    panel.addEventListener('click', (e) => {
-        if (e.target === panel) {
-            closePanel({ returnFocus: false });
-        }
-    });
-
-    // Submit new post
-    submitBtn.addEventListener('click', () => {
-        const content = textarea.value.trim();
-        if (!content) {
-            textarea.focus();
-            return;
-        }
-
-        const post = {
-            id: Date.now(),
+        return {
+            id: Number.isFinite(Number(rawPost.id)) ? Number(rawPost.id) : Date.now() + index,
             content,
-            author: 'Anonymous Shark',
-            timestamp: new Date().toLocaleString(),
-            likes: 0
+            author: typeof rawPost.author === 'string' && rawPost.author.trim()
+                ? rawPost.author.trim().slice(0, 40)
+                : 'Anonymous Shark',
+            timestamp: typeof rawPost.timestamp === 'string' && rawPost.timestamp.trim()
+                ? rawPost.timestamp.trim()
+                : new Date().toLocaleString(),
+            likes: Number.isFinite(Number(rawPost.likes)) && Number(rawPost.likes) >= 0
+                ? Math.floor(Number(rawPost.likes))
+                : 0
+        };
+    }
+
+    function loadPosts() {
+        const current = safeReadJSON(STORAGE_KEYS.sharkboard);
+        const legacy = safeReadJSON(LEGACY_STORAGE_KEYS.sharkboard);
+        const source = Array.isArray(current)
+            ? current
+            : Array.isArray(current?.posts)
+                ? current.posts
+                : Array.isArray(legacy)
+                    ? legacy
+                    : [];
+
+        const normalized = source
+            .map((post, index) => normalizePost(post, index))
+            .filter(Boolean)
+            .slice(0, MAX_SHARKBOARD_POSTS);
+
+        persistPosts(normalized);
+        return normalized;
+    }
+
+    function persistPosts(nextPosts) {
+        const payload = {
+            version: 1,
+            posts: nextPosts.slice(0, MAX_SHARKBOARD_POSTS)
         };
 
-        posts.unshift(post);
-        savePosts();
-        textarea.value = '';
-        charCount.textContent = '0';
-        renderPosts();
-        textarea.focus();
-    });
+        safeWriteStorage(STORAGE_KEYS.sharkboard, JSON.stringify(payload));
+        safeRemoveStorage(LEGACY_STORAGE_KEYS.sharkboard);
+    }
+
+    function updateComposerState() {
+        const length = textarea.value.length;
+        const hasContent = textarea.value.trim().length > 0;
+        charCount.textContent = String(length);
+        submitButton.disabled = !hasContent;
+    }
 
     function renderPosts() {
         if (posts.length === 0) {
@@ -750,15 +1103,15 @@ document.querySelectorAll('.shimmer-word').forEach((shimmerElement) => {
             return;
         }
 
-        postsContainer.innerHTML = posts.map(post => `
-            <div class="sharkboard-post">
+        postsContainer.innerHTML = posts.map((post) => `
+            <article class="sharkboard-post" data-post-id="${post.id}">
                 <div class="sharkboard-post-meta">
                     <span class="sharkboard-post-author">${escapeHtml(post.author)}</span>
-                    <span>${post.timestamp}</span>
+                    <span>${escapeHtml(post.timestamp)}</span>
                 </div>
                 <div class="sharkboard-post-content">${escapeHtml(post.content)}</div>
                 <div class="sharkboard-post-actions">
-                    <button type="button" class="sharkboard-post-action" data-post-id="${post.id}" data-action="like">
+                    <button type="button" class="sharkboard-post-action" data-post-id="${post.id}" data-action="like" aria-label="Like post">
                         ❤️ ${post.likes}
                     </button>
                     <button type="button" class="sharkboard-post-action" data-post-id="${post.id}" data-action="edit">
@@ -768,168 +1121,241 @@ document.querySelectorAll('.shimmer-word').forEach((shimmerElement) => {
                         🗑️ Delete
                     </button>
                 </div>
-            </div>
+            </article>
         `).join('');
-
-        // Attach action listeners
-        postsContainer.querySelectorAll('.sharkboard-post-action').forEach((btn) => {
-            btn.addEventListener('click', handlePostAction);
-        });
     }
 
-    function handlePostAction(e) {
-        const postId = parseInt(e.currentTarget.dataset.postId);
-        const action = e.currentTarget.dataset.action;
-        const postIndex = posts.findIndex(p => p.id === postId);
+    function openPanel() {
+        lastFocusedElement = document.activeElement;
+        panel.hidden = false;
+        document.body.classList.add('panel-open');
+        toggle.setAttribute('aria-expanded', 'true');
+        renderPosts();
+        trap.activate();
+        announceStatus('SharkBoard opened.');
+    }
 
+    function closePanel({ returnFocus = true } = {}) {
+        if (panel.hidden) return;
+
+        panel.hidden = true;
+        document.body.classList.remove('panel-open');
+        toggle.setAttribute('aria-expanded', 'false');
+        trap.deactivate();
+
+        if (returnFocus) {
+            const focusTarget = lastFocusedElement && typeof lastFocusedElement.focus === 'function'
+                ? lastFocusedElement
+                : toggle;
+            focusTarget.focus();
+        }
+
+        announceStatus('SharkBoard closed.');
+    }
+
+    function saveAndRender() {
+        posts = posts.slice(0, MAX_SHARKBOARD_POSTS);
+        persistPosts(posts);
+        renderPosts();
+    }
+
+    textarea.addEventListener('input', updateComposerState);
+
+    toggle.addEventListener('click', () => {
+        if (panel.hidden) {
+            openPanel();
+            return;
+        }
+
+        closePanel({ returnFocus: false });
+    });
+
+    closeButton.addEventListener('click', () => {
+        closePanel();
+    });
+
+    document.addEventListener('mousedown', (event) => {
+        if (panel.hidden) return;
+        if (panel.contains(event.target) || toggle.contains(event.target)) return;
+        closePanel({ returnFocus: false });
+    });
+
+    submitButton.addEventListener('click', () => {
+        const content = textarea.value.trim();
+        if (!content) {
+            textarea.focus();
+            announceStatus('Write something before posting.');
+            return;
+        }
+
+        const post = normalizePost({
+            id: Date.now(),
+            content,
+            author: 'Anonymous Shark',
+            timestamp: new Date().toLocaleString(),
+            likes: 0
+        }, 0);
+
+        posts.unshift(post);
+        posts = posts.slice(0, MAX_SHARKBOARD_POSTS);
+        textarea.value = '';
+        updateComposerState();
+        saveAndRender();
+        textarea.focus();
+        announceStatus('Post saved to this browser.');
+    });
+
+    textarea.addEventListener('keydown', (event) => {
+        if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+            event.preventDefault();
+            submitButton.click();
+        }
+    });
+
+    postsContainer.addEventListener('click', (event) => {
+        const actionButton = event.target.closest('.sharkboard-post-action');
+        if (!actionButton) return;
+
+        const postId = Number(actionButton.dataset.postId);
+        const action = actionButton.dataset.action;
+        const postIndex = posts.findIndex((post) => post.id === postId);
         if (postIndex === -1) return;
 
         if (action === 'like') {
             posts[postIndex].likes += 1;
-        } else if (action === 'edit') {
-            const newContent = prompt('Edit your post:', posts[postIndex].content);
-            if (newContent !== null && newContent.trim()) {
-                posts[postIndex].content = newContent.trim();
-            }
-        } else if (action === 'delete') {
-            if (confirm('Are you sure you want to delete this post?')) {
-                posts.splice(postIndex, 1);
-            }
+            saveAndRender();
+            announceStatus('Post liked.');
+            return;
         }
 
-        savePosts();
-        renderPosts();
-    }
+        if (action === 'edit') {
+            const newContent = window.prompt('Edit your post:', posts[postIndex].content);
+            if (newContent === null) return;
 
-    function escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
+            const trimmed = newContent.trim();
+            if (!trimmed) {
+                announceStatus('Empty edits were not saved.');
+                return;
+            }
 
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && !panel.hidden) {
-            e.preventDefault();
-            closePanel();
+            posts[postIndex].content = trimmed.slice(0, 500);
+            saveAndRender();
+            announceStatus('Post updated.');
+            return;
+        }
+
+        if (action === 'delete') {
+            const confirmed = window.confirm('Are you sure you want to delete this post?');
+            if (!confirmed) return;
+
+            posts.splice(postIndex, 1);
+            saveAndRender();
+            announceStatus('Post deleted.');
         }
     });
 
     toggle.setAttribute('aria-expanded', 'false');
-
-    // Initial render
+    updateComposerState();
     renderPosts();
 })();
 
-// 16. Keyboard Shortcuts Overlay — ? toggles, g-then-X sequences for nav, / focuses search.
-//     Skips when the visitor is typing in any text input, so the keys keep working normally
-//     inside the search box itself.
+// 16. Keyboard shortcuts overlay
 (function initKeyboardShortcuts() {
     const overlay = document.getElementById('shortcuts-overlay');
-    const closeBtn = document.getElementById('shortcuts-close');
-    if (!overlay) return;
+    const closeButton = document.getElementById('shortcuts-close');
+    const searchField = document.getElementById('suite-search');
+    const badge = document.getElementById('visitor-badge');
+    const audioToggle = document.getElementById('audio-toggle');
+    const sharkboardToggle = document.getElementById('sharkboard-toggle');
+    if (!overlay || !closeButton) return;
 
-    const badgeEl = document.getElementById('visitor-badge');
-    const audioToggleEl = document.getElementById('audio-toggle');
-    const searchEl = document.getElementById('suite-search');
-    const sharkboardToggleEl = document.getElementById('sharkboard-toggle');
-
-    // Remember the element that had focus before we opened the overlay, so we can
-    // return to it on close. Without this, focus drops to <body> and the next Tab
-    // starts from the top of the page, which feels broken.
     let returnFocus = null;
-
-    // "g" prefix state: a single 'g' sets pendingG=true; if the next key arrives
-    // within 800ms it's consumed as a sequence; otherwise pendingG decays and the
-    // next key is treated normally.
     let pendingG = false;
     let pendingGTimer = null;
-    const G_WINDOW_MS = 800;
+    const gWindowMs = 800;
 
-    function openOverlay() {
-        returnFocus = document.activeElement;
-        overlay.hidden = false;
-        // Defer the focus so the [hidden] removal and the focus call don't race.
-        requestAnimationFrame(() => {
-            const firstKbd = overlay.querySelector('kbd');
-            if (firstKbd) firstKbd.focus();
-        });
-    }
+    const trap = createFocusTrap(overlay, {
+        initialFocus: () => closeButton,
+        onEscape: () => closeOverlay()
+    });
 
-    function closeOverlay() {
-        if (overlay.hidden) return;
-        overlay.hidden = true;
-        if (returnFocus && typeof returnFocus.focus === 'function') {
-            returnFocus.focus();
-        }
-        returnFocus = null;
-    }
-
-    function isTypingTarget(t) {
-        if (!t) return false;
-        const tag = t.tagName;
-        return tag === 'INPUT' || tag === 'TEXTAREA' || t.isContentEditable;
+    function isTypingTarget(target) {
+        if (!target) return false;
+        const tagName = target.tagName;
+        return tagName === 'INPUT' || tagName === 'TEXTAREA' || target.isContentEditable;
     }
 
     function setPendingG() {
         pendingG = true;
         clearTimeout(pendingGTimer);
-        pendingGTimer = setTimeout(() => { pendingG = false; }, G_WINDOW_MS);
+        pendingGTimer = setTimeout(() => {
+            pendingG = false;
+        }, gWindowMs);
     }
 
-    function handleKeydown(e) {
-        // Escape closes regardless of focus context, except inside text inputs where
-        // the user may be cancelling IME composition. We let it through there too —
-        // it's a globally useful key.
-        if (e.key === 'Escape') {
-            if (!overlay.hidden) {
-                e.preventDefault();
-                closeOverlay();
-                return;
-            }
+    function openOverlay() {
+        returnFocus = document.activeElement;
+        overlay.hidden = false;
+        trap.activate();
+        announceStatus('Keyboard shortcuts opened.');
+    }
+
+    function closeOverlay() {
+        if (overlay.hidden) return;
+        overlay.hidden = true;
+        trap.deactivate();
+        if (returnFocus && typeof returnFocus.focus === 'function') {
+            returnFocus.focus();
+        }
+        returnFocus = null;
+        announceStatus('Keyboard shortcuts closed.');
+    }
+
+    function handleKeydown(event) {
+        if (event.key === 'Escape' && !overlay.hidden) {
+            event.preventDefault();
+            closeOverlay();
+            return;
         }
 
-        // Don't steal keys from text inputs. '/' is the only exception: the spec
-        // says press / to focus search, and that only makes sense if the user isn't
-        // already typing in something — which is exactly when isTypingTarget is false.
-        if (isTypingTarget(e.target)) return;
+        if (isTypingTarget(event.target)) return;
 
-        // '?' is shift+/ on most keyboards. e.key normalises to '?' either way.
-        if (e.key === '?') {
-            e.preventDefault();
+        if (event.key === '?') {
+            event.preventDefault();
             if (overlay.hidden) openOverlay(); else closeOverlay();
             return;
         }
 
-        if (e.key === '/') {
-            if (searchEl) {
-                e.preventDefault();
-                searchEl.focus();
-                searchEl.select();
+        if (!overlay.hidden) return;
+
+        if (event.key === '/') {
+            if (searchField) {
+                event.preventDefault();
+                searchField.focus();
+                searchField.select();
             }
             return;
         }
 
-        if (e.key === 'm' && badgeEl) {
-            e.preventDefault();
-            badgeEl.click();
+        if (event.key === 'm' && badge) {
+            event.preventDefault();
+            badge.click();
             return;
         }
 
-        if (e.key === 'a' && audioToggleEl) {
-            e.preventDefault();
-            audioToggleEl.click();
+        if (event.key === 'a' && audioToggle) {
+            event.preventDefault();
+            audioToggle.click();
             return;
         }
 
-        if (e.key === 'b' && sharkboardToggleEl) {
-            e.preventDefault();
-            sharkboardToggleEl.click();
+        if (event.key === 'b' && sharkboardToggle) {
+            event.preventDefault();
+            sharkboardToggle.click();
             return;
         }
 
-        if (e.key === 'g') {
-            // Don't preventDefault on the first 'g' — it might be a normal keypress
-            // that just happens to start a sequence. We only consume the second key.
+        if (event.key === 'g') {
             setPendingG();
             return;
         }
@@ -937,28 +1363,26 @@ document.querySelectorAll('.shimmer-word').forEach((shimmerElement) => {
         if (pendingG) {
             pendingG = false;
             clearTimeout(pendingGTimer);
-            if (e.key === 'h') {
-                e.preventDefault();
+
+            if (event.key === 'h') {
+                event.preventDefault();
                 window.scrollTo({ top: 0, behavior: 'smooth' });
                 return;
             }
-            if (e.key === 's') {
-                e.preventDefault();
+
+            if (event.key === 's') {
+                event.preventDefault();
                 const suite = document.getElementById('suite');
                 if (suite) suite.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                return;
             }
         }
     }
 
     window.addEventListener('keydown', handleKeydown);
-
-    if (closeBtn) {
-        closeBtn.addEventListener('click', closeOverlay);
-    }
-
-    // Clicking the backdrop (but not the card itself) closes the overlay too.
-    overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) closeOverlay();
+    closeButton.addEventListener('click', closeOverlay);
+    overlay.addEventListener('click', (event) => {
+        if (event.target === overlay) {
+            closeOverlay();
+        }
     });
 })();

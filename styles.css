@@ -28,6 +28,22 @@ body {
     line-height: 1.6;
 }
 
+body.panel-open {
+    overflow: hidden;
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
 /* Ambient Living Background Animation */
 body::before {
     content: '';
@@ -292,10 +308,12 @@ input:focus-visible,
 
 /* Suite search box */
 .suite-search-wrap {
-    grid-column: 1 / -1;
     display: flex;
     justify-content: center;
-    margin-bottom: 0.5rem;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    flex-wrap: wrap;
 }
 
 .suite-search {
@@ -321,6 +339,49 @@ input:focus-visible,
     outline: none;
     border-color: rgba(56, 189, 248, 0.5);
     box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.12);
+}
+
+.suite-toolbar {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    text-align: center;
+}
+
+.suite-title {
+    font-size: 1.35rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+}
+
+.suite-results,
+.suite-active-filter {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.suite-clear {
+    border: 1px solid var(--card-border);
+    border-radius: 100px;
+    padding: 0.65rem 1rem;
+    background: rgba(30, 41, 59, 0.4);
+    color: var(--text-main);
+    font-family: inherit;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: border-color 0.25s ease, color 0.25s ease, box-shadow 0.25s ease, transform 0.2s ease;
+}
+
+.suite-clear:hover {
+    border-color: rgba(56, 189, 248, 0.4);
+    color: var(--accent);
+    transform: translateY(-1px);
+}
+
+.suite-clear[hidden] {
+    display: none;
 }
 
 /* Suite chip filter */
@@ -658,6 +719,7 @@ nav a:hover::after {
 }
 
 .badge {
+    appearance: none;
     background: rgba(56, 189, 248, 0.1);
     border: 1px solid rgba(56, 189, 248, 0.2);
     color: var(--accent);
@@ -750,6 +812,8 @@ h1 span {
     position: relative;
     overflow: hidden;
     box-shadow: 0 18px 36px rgba(2, 6, 23, 0.18);
+    text-decoration: none;
+    color: inherit;
 }
 
 .card > * {
@@ -821,6 +885,33 @@ h1 span {
     margin-bottom: 0.75rem;
     letter-spacing: -0.01em;
     transition: color 0.3s ease;
+}
+
+.card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin-bottom: 0.85rem;
+}
+
+.card-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.6rem;
+    border-radius: 100px;
+    background: rgba(56, 189, 248, 0.1);
+    border: 1px solid rgba(56, 189, 248, 0.16);
+    color: #c5f1ff;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.card-pill-external {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.08);
+    color: var(--text-muted);
 }
 
 .card:hover h3 {
@@ -991,12 +1082,22 @@ footer {
 @media (max-width: 768px) {
     h1 { font-size: 2.5rem; }
     header { padding: 1.5rem 5%; }
+    .header-tools {
+        gap: 1rem;
+    }
     nav { display: none; }
     .header-tools { gap: 0; }
     .hero::before,
     .hero::after {
         width: min(100vw, 520px);
         height: min(100vw, 520px);
+    }
+    .suite-search-wrap {
+        flex-direction: column;
+    }
+    .suite-clear {
+        width: 100%;
+        max-width: 420px;
     }
 }
 
@@ -1146,6 +1247,10 @@ footer {
 .overlay-close:hover {
     background: #7dd3fc;
     transform: translateY(-1px);
+}
+
+.overlay-card:focus {
+    outline: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1373,6 +1478,13 @@ footer {
     transform: translateY(0);
 }
 
+.sharkboard-submit:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+    transform: none;
+    box-shadow: none;
+}
+
 .sharkboard-posts {
     flex: 1;
     overflow-y: auto;
@@ -1420,6 +1532,7 @@ footer {
 
 .sharkboard-post-actions {
     display: flex;
+    flex-wrap: wrap;
     gap: 0.5rem;
     font-size: 0.85rem;
 }

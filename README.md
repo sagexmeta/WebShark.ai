@@ -26,14 +26,19 @@ Then visit `http://localhost:8000`.
 
 ## Current behavior
 
+- the header shows a live visitor count when CounterAPI is available
 - suite cards can be filtered by category or searched by text
+- the suite toolbar shows result counts, active filter state, and a reset control
+- visible metadata pills summarize each suite card's categories
 - keyboard shortcuts are available via `?`
-- ambient audio is optional and visitor-controlled
+- ambient audio is optional, visitor-controlled, and lazily loads the YouTube player
 - SharkBoard stores posts in `localStorage`, so its content is browser-local rather than shared across devices
 
 ## Maintenance notes
 
 - when adding a new suite card, keep its `data-tags` aligned with an available filter chip
 - if a new interaction is exposed in the UI, ensure the page actually loads the script that powers it
+- SharkBoard persistence is versioned in `script.js`; preserve the migration path from the legacy `sharkboard-posts` key unless intentionally removing it
+- ambient audio still depends on the global `window.onYouTubeIframeAPIReady` hook even though the API script now loads on demand
 
 
