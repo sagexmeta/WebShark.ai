@@ -1,22 +1,19 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="800" height="150" viewBox="0 0 500 150">
   <style>
     .bg { fill: #0d1117; }
-    .text { font-family: monospace; font-size: 16px; fill: #58a6ff; white-space: pre; }
+    .text { font-family: monospace; font-size: 25px; fill: #58a6ff; white-space: pre; }
     .shark {
-      animation: swim 7s linear infinite;
+      animation: swim 6s linear infinite;
     }
     @keyframes swim {
-      0% { transform: translateX(-350px); }
+      0% { transform: translateX(-250px); }
       100% { transform: translateX(500px); }
     }
   </style>
   <rect width="100%" height="100%" class="bg" />
   <g class="shark">
-    <text x="0" y="30" class="text">                 ,.</text>
-    <text x="0" y="45" class="text">               -._ -.</text>
-    <text x="0" y="60" class="text">           _.._   `-.`.</text>
-    <text x="0" y="75" class="text">    <=======(((( )>---> _/`-.`._</text>
-    <text x="0" y="90" class="text">          `--.._   _.-'`</text>
-    <text x="0" y="105" class="text">                `-.'</text>
+    <text x="0" y="50" class="text">   /\"-...</text>
+    <text x="0" y="65" class="text">  &gt;(*)</text>
+    <text x="0" y="80" class="text">   /\"-...</text>
   </g>
 </svg>
