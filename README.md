@@ -9,6 +9,9 @@ WebShark.ai is a static landing page for the broader WebShark suite. It highligh
 - `index.html` - page structure and suite catalog
 - `styles.css` - visual design, animations, and responsive styling
 - `script.js` - interaction logic for search, filters, audio, shortcuts, and SharkBoard
+- `about.html` / `about.css` - creator profile and supporting header styles
+- `sageos-launch.html` / `sageos-launch.css` / `sageos-launch.js` - SageOS launch simulation and workspace orchestration
+- `sageos-workspace.html` / `sageos-workspace.css` / `sageos-workspace.js` - customizable workspace desktop and app launcher
 
 There is no build step, framework, or package manager.
 
@@ -33,6 +36,8 @@ Then visit `http://localhost:8000`.
 - visitors can sign an experience guestbook, tag which apps they tried, and react with upvotes/downvotes
 - keyboard shortcuts are available via `?`
 - ambient audio is optional, visitor-controlled, and lazily loads the YouTube player
+- non-critical motion effects are deferred to idle time to protect first-load responsiveness
+- skip-to-content navigation and improved metadata are included for accessibility and SEO quality
 - SharkBoard and the feedback guestbook store entries in `localStorage`, so their content is browser-local rather than shared across devices
 
 ## Maintenance notes

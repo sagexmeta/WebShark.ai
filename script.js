@@ -160,6 +160,14 @@ function createFocusTrap(container, { initialFocus, onEscape } = {}) {
     };
 }
 
+function runWhenIdle(task, timeout = 900) {
+    if (typeof window.requestIdleCallback === 'function') {
+        window.requestIdleCallback(() => task(), { timeout });
+        return;
+    }
+    window.setTimeout(task, Math.min(timeout, 350));
+}
+
 // 0. Shared pointer state
 const sharkCursor = document.getElementById('custom-shark-cursor');
 const pointerState = {
@@ -368,7 +376,8 @@ revealElements.forEach((element, index) => {
 })();
 
 // 6. Ambient rising bubble field
-(function initBubbleField() {
+runWhenIdle(() => {
+    (function initBubbleField() {
     const canvas = document.getElementById('bubble-field');
     if (!canvas || prefersReducedMotion) return;
 
@@ -533,20 +542,23 @@ revealElements.forEach((element, index) => {
     resize();
     createBubbles();
     draw();
-})();
+    })();
+}, 1400);
 
 // 7. Shimmer hover effect
-document.querySelectorAll('.shimmer-word').forEach((shimmerElement) => {
-    shimmerElement.addEventListener('mouseenter', () => {
-        shimmerElement.style.animationDuration = '1s';
-        shimmerElement.style.filter = 'drop-shadow(0 0 8px rgba(56, 189, 248, 0.6))';
-    });
+runWhenIdle(() => {
+    document.querySelectorAll('.shimmer-word').forEach((shimmerElement) => {
+        shimmerElement.addEventListener('mouseenter', () => {
+            shimmerElement.style.animationDuration = '1s';
+            shimmerElement.style.filter = 'drop-shadow(0 0 8px rgba(56, 189, 248, 0.6))';
+        });
 
-    shimmerElement.addEventListener('mouseleave', () => {
-        shimmerElement.style.animationDuration = '3.5s';
-        shimmerElement.style.filter = 'none';
+        shimmerElement.addEventListener('mouseleave', () => {
+            shimmerElement.style.animationDuration = '3.5s';
+            shimmerElement.style.filter = 'none';
+        });
     });
-});
+}, 1200);
 
 // 8. Scroll cue
 (function initScrollCue() {

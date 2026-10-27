@@ -44,6 +44,25 @@ body.panel-open {
     border: 0;
 }
 
+.skip-link {
+    position: fixed;
+    top: 0.5rem;
+    left: 0.75rem;
+    z-index: 12000;
+    padding: 0.55rem 0.85rem;
+    border-radius: 0.55rem;
+    border: 1px solid rgba(56, 189, 248, 0.45);
+    background: rgba(10, 15, 29, 0.96);
+    color: var(--text-main);
+    text-decoration: none;
+    transform: translateY(-140%);
+    transition: transform 0.2s ease;
+}
+
+.skip-link:focus {
+    transform: translateY(0);
+}
+
 /* Ambient Living Background Animation */
 body::before {
     content: '';
