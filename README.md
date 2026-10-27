@@ -31,6 +31,8 @@ Then visit `http://localhost:8000`.
 
 - the header shows a live visitor count when CounterAPI is available
 - suite cards can be filtered by category or searched by text
+- portfolio taxonomy and quick-start pathways help visitors jump to relevant parts of the suite
+- featured creations are highlighted with audience/outcome context for faster first launches
 - the suite toolbar shows result counts, active filter state, and a reset control
 - visible metadata pills summarize each suite card's categories
 - visitors can sign an experience guestbook, tag which apps they tried, and react with upvotes/downvotes
@@ -43,6 +45,7 @@ Then visit `http://localhost:8000`.
 ## Maintenance notes
 
 - when adding a new suite card, keep its `data-tags` aligned with an available filter chip
+- product guidance and featured ordering are managed in `script.js` via `PRODUCT_PROFILE_MAP`, `PORTFOLIO_TAXONOMY`, and `QUICK_START_PATHS`
 - guestbook app choices are derived from suite card titles in `script.js`, so changing a card title changes the available feedback labels too
 - if a new interaction is exposed in the UI, ensure the page actually loads the script that powers it
 - SharkBoard persistence is versioned in `script.js`; preserve the migration path from the legacy `sharkboard-posts` key unless intentionally removing it

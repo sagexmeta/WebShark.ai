@@ -795,6 +795,207 @@ h1 span {
     animation: slideUp 1.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+.hero-actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 2rem;
+}
+
+.hero-primary-action,
+.hero-secondary-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    padding: 0.65rem 1.15rem;
+    font-size: 0.88rem;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.hero-primary-action {
+    border: none;
+    background: var(--accent);
+    color: var(--bg-dark);
+    cursor: pointer;
+    box-shadow: 0 0 18px var(--accent-glow);
+}
+
+.hero-primary-action:hover {
+    background: #7dd3fc;
+    transform: translateY(-1px);
+}
+
+.hero-secondary-action {
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    color: var(--accent);
+    background: rgba(56, 189, 248, 0.08);
+}
+
+.hero-secondary-action:hover {
+    background: rgba(56, 189, 248, 0.2);
+}
+
+.portfolio-guide {
+    width: 100%;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 2rem 2rem 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.1rem;
+}
+
+.portfolio-guide-head {
+    text-align: center;
+}
+
+.portfolio-guide-kicker {
+    color: var(--accent);
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 0.25rem;
+}
+
+.portfolio-guide-head h2 {
+    font-size: 1.7rem;
+    letter-spacing: -0.03em;
+    margin-bottom: 0.35rem;
+}
+
+.portfolio-guide-copy {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+}
+
+.taxonomy-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0.85rem;
+}
+
+.taxonomy-card {
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    background: rgba(30, 41, 59, 0.35);
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.taxonomy-card h3 {
+    font-size: 1rem;
+}
+
+.taxonomy-card p {
+    color: var(--text-muted);
+    font-size: 0.88rem;
+}
+
+.taxonomy-card .taxonomy-tag-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+.taxonomy-card .taxonomy-tag {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border: 1px solid rgba(56, 189, 248, 0.22);
+    color: #c5f1ff;
+    border-radius: 999px;
+    padding: 0.2rem 0.52rem;
+    background: rgba(56, 189, 248, 0.09);
+}
+
+.quickstart-shell,
+.featured-shell {
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    background: rgba(30, 41, 59, 0.26);
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.quickstart-shell h3,
+.featured-shell h3 {
+    font-size: 1rem;
+}
+
+.quickstart-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0.55rem;
+}
+
+.quickstart-button {
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    background: rgba(56, 189, 248, 0.08);
+    color: var(--text-main);
+    text-align: left;
+    padding: 0.62rem 0.74rem;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.84rem;
+    font-weight: 600;
+}
+
+.quickstart-button span {
+    display: block;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 500;
+    margin-top: 0.18rem;
+}
+
+.quickstart-button:hover {
+    border-color: rgba(56, 189, 248, 0.45);
+    background: rgba(56, 189, 248, 0.14);
+}
+
+.featured-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 0.6rem;
+}
+
+.featured-link {
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    background: rgba(8, 18, 33, 0.82);
+    padding: 0.7rem 0.8rem;
+    color: var(--text-main);
+    text-decoration: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.featured-link strong {
+    font-size: 0.88rem;
+}
+
+.featured-link span {
+    color: var(--text-muted);
+    font-size: 0.77rem;
+}
+
+.featured-link:hover {
+    border-color: rgba(56, 189, 248, 0.5);
+    box-shadow: 0 0 14px var(--accent-glow);
+}
+
 /* Interactive Suite Grid */
 .suite-grid {
     display: grid;
@@ -1425,6 +1626,20 @@ footer {
     }
     .suite-search-wrap {
         flex-direction: column;
+    }
+    .hero-actions {
+        width: 100%;
+    }
+    .hero-primary-action,
+    .hero-secondary-action {
+        width: 100%;
+        max-width: 320px;
+    }
+    .portfolio-guide {
+        padding: 0 1.25rem 1.25rem 1.25rem;
+    }
+    .portfolio-guide-head h2 {
+        font-size: 1.45rem;
     }
     .suite-clear {
         width: 100%;

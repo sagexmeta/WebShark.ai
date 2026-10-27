@@ -23,6 +23,43 @@ const TAG_LABELS = {
     wellness: 'Wellness'
 };
 
+const PORTFOLIO_TAXONOMY = [
+    {
+        id: 'build',
+        title: 'Build and Ship',
+        description: 'Design, prototype, and deploy practical software tools quickly.',
+        tags: ['build', 'ai', 'business']
+    },
+    {
+        id: 'insight',
+        title: 'Data and Insight',
+        description: 'Analyze complex patterns and turn signals into usable decisions.',
+        tags: ['data', 'research', 'risk']
+    },
+    {
+        id: 'simulate',
+        title: 'Simulate and Explore',
+        description: 'Model ideas, environments, and systems with interactive experiments.',
+        tags: ['sim', 'research', 'wellness']
+    }
+];
+
+const QUICK_START_PATHS = [
+    { label: 'Launch an AI builder stack', hint: 'UI + Copilot + Designer', tag: 'build', query: 'ai build' },
+    { label: 'Investigate risk and controls', hint: 'Risk + manager workflows', tag: 'risk', query: 'risk aml business' },
+    { label: 'Start data research fast', hint: 'Data Studio + insights', tag: 'data', query: 'data research' },
+    { label: 'Explore simulation tools', hint: 'Environment and sandbox models', tag: 'sim', query: 'simulator simulation' }
+];
+
+const PRODUCT_PROFILE_MAP = {
+    'WebShark UI': { audience: 'Product teams', outcome: 'Ship UI systems faster', featuredRank: 1 },
+    'WebShark Data Studio': { audience: 'Data teams', outcome: 'Run analysis and research workflows', featuredRank: 2 },
+    'WebShark Manager': { audience: 'Operations', outcome: 'Coordinate plans and execution', featuredRank: 4 },
+    'WebShark Marimo Copilot': { audience: 'AI practitioners', outcome: 'Guide notebook planning and iteration', featuredRank: 3 },
+    'WebShark Global Insights': { audience: 'Researchers', outcome: 'Model global scenarios quickly', featuredRank: 5 },
+    'WebShark Risk': { audience: 'Risk analysts', outcome: 'Investigate AML and financial controls', featuredRank: 6 }
+};
+
 const MAX_SHARKBOARD_POSTS = 50;
 const MAX_FEEDBACK_ENTRIES = 75;
 const prefersReducedMotionEarly = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -87,6 +124,10 @@ function normalizeText(text) {
         .normalize('NFKD')
         .replace(/[^a-z0-9]+/g, ' ')
         .trim();
+}
+
+function slugifyText(text) {
+    return normalizeText(text).replace(/\s+/g, '-');
 }
 
 function escapeHtml(text) {
@@ -167,6 +208,40 @@ function runWhenIdle(task, timeout = 900) {
     }
     window.setTimeout(task, Math.min(timeout, 350));
 }
+
+function buildProductCatalog(sourceCards) {
+    return sourceCards.map((card, index) => {
+        const title = card.querySelector('h3')?.textContent?.trim() || `WebShark Tool ${index + 1}`;
+        const description = card.querySelector('p')?.textContent?.trim() || '';
+        const icon = card.querySelector('.card-icon')?.textContent?.trim() || '🦈';
+        const href = card.getAttribute('href') || '#';
+        const rawTags = (card.dataset.tags || '')
+            .split(/\s+/)
+            .map((tag) => tag.trim().toLowerCase())
+            .filter(Boolean);
+        const profile = PRODUCT_PROFILE_MAP[title] || {};
+
+        return {
+            id: slugifyText(title),
+            card,
+            title,
+            description,
+            icon,
+            href,
+            rawTags,
+            audience: profile.audience || 'General',
+            outcome: profile.outcome || 'Discover and launch focused workflows',
+            featuredRank: Number.isFinite(Number(profile.featuredRank)) ? Number(profile.featuredRank) : 999,
+            normalizedName: normalizeText(title),
+            normalizedDescription: normalizeText(description),
+            normalizedTags: normalizeText(rawTags.join(' ')),
+            normalizedAudience: normalizeText(profile.audience || ''),
+            normalizedOutcome: normalizeText(profile.outcome || '')
+        };
+    });
+}
+
+const PRODUCT_CATALOG = buildProductCatalog(cards);
 
 // 0. Shared pointer state
 const sharkCursor = document.getElementById('custom-shark-cursor');
@@ -593,11 +668,8 @@ runWhenIdle(() => {
 
 // 10. Visible suite metadata
 (function initCardMetadata() {
-    cards.forEach((card) => {
-        const tags = (card.dataset.tags || '')
-            .split(/\s+/)
-            .map((tag) => tag.trim().toLowerCase())
-            .filter(Boolean);
+    PRODUCT_CATALOG.forEach((product) => {
+        const { card, rawTags: tags } = product;
 
         if (tags.length === 0) return;
 
@@ -615,6 +687,11 @@ runWhenIdle(() => {
         externalPill.className = 'card-pill card-pill-external';
         externalPill.textContent = 'External app';
         meta.appendChild(externalPill);
+
+        const audiencePill = document.createElement('span');
+        audiencePill.className = 'card-pill card-pill-external';
+        audiencePill.textContent = product.audience;
+        meta.appendChild(audiencePill);
 
         const title = card.querySelector('h3');
         if (title) {
@@ -641,20 +718,17 @@ runWhenIdle(() => {
     let activeTag = 'all';
     let suppressUrlWrite = false;
 
-    const indexedCards = suiteCards.map((card) => {
-        const rawTags = (card.dataset.tags || '')
-            .split(/\s+/)
-            .map((tag) => tag.trim().toLowerCase())
-            .filter(Boolean);
-
-        return {
-            card,
-            rawTags,
-            normalizedName: normalizeText(card.querySelector('h3')?.textContent || ''),
-            normalizedDescription: normalizeText(card.querySelector('p')?.textContent || ''),
-            normalizedTags: normalizeText(rawTags.join(' '))
-        };
-    });
+    const indexedCards = PRODUCT_CATALOG
+        .filter((entry) => suiteCards.includes(entry.card))
+        .map((entry) => ({
+            card: entry.card,
+            rawTags: entry.rawTags,
+            normalizedName: entry.normalizedName,
+            normalizedDescription: entry.normalizedDescription,
+            normalizedTags: entry.normalizedTags,
+            normalizedAudience: entry.normalizedAudience,
+            normalizedOutcome: entry.normalizedOutcome
+        }));
 
     function buildURL(query, tag) {
         const params = new URLSearchParams();
@@ -719,7 +793,9 @@ runWhenIdle(() => {
             const matchesQuery = !normalizedQuery
                 || entry.normalizedName.includes(normalizedQuery)
                 || entry.normalizedDescription.includes(normalizedQuery)
-                || entry.normalizedTags.includes(normalizedQuery);
+                || entry.normalizedTags.includes(normalizedQuery)
+                || entry.normalizedAudience.includes(normalizedQuery)
+                || entry.normalizedOutcome.includes(normalizedQuery);
             const matchesTag = activeTag === 'all' || entry.rawTags.includes(activeTag);
             const visible = matchesQuery && matchesTag;
 
@@ -787,7 +863,90 @@ runWhenIdle(() => {
     });
 })();
 
-// 12. Optional ambient background audio
+// 12. Portfolio taxonomy, quick-start, and featured guidance
+(function initPortfolioGuide() {
+    const taxonomyGrid = document.getElementById('taxonomy-grid');
+    const quickstartGrid = document.getElementById('quickstart-grid');
+    const featuredGrid = document.getElementById('featured-grid');
+    const heroLaunchButton = document.getElementById('hero-launch-sageos');
+    const sageOsButton = document.getElementById('sageos-open');
+    if (!taxonomyGrid || !quickstartGrid || !featuredGrid) return;
+
+    function applySuiteRoute({ tag = 'all', query = '' } = {}) {
+        const suite = document.getElementById('suite');
+        const input = document.getElementById('suite-search');
+        const chipsContainer = document.getElementById('suite-chips');
+        if (!suite || !input || !chipsContainer) return;
+
+        const safeTag = chipsContainer.querySelector(`[data-tag="${tag}"]`) ? tag : 'all';
+        input.value = query;
+        const chipToActivate = chipsContainer.querySelector(`[data-tag="${safeTag}"]`);
+        if (chipToActivate) {
+            chipToActivate.click();
+        } else {
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+
+        if (!chipToActivate) {
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+
+        suite.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    taxonomyGrid.innerHTML = PORTFOLIO_TAXONOMY.map((pillar) => `
+        <article class="taxonomy-card" role="listitem">
+            <h3>${escapeHtml(pillar.title)}</h3>
+            <p>${escapeHtml(pillar.description)}</p>
+            <div class="taxonomy-tag-list">
+                ${pillar.tags.map((tag) => `<button type="button" class="taxonomy-tag" data-taxonomy-tag="${escapeHtml(tag)}">${escapeHtml(TAG_LABELS[tag] || tag)}</button>`).join('')}
+            </div>
+        </article>
+    `).join('');
+
+    quickstartGrid.innerHTML = QUICK_START_PATHS.map((path) => `
+        <button type="button" class="quickstart-button" data-route-tag="${escapeHtml(path.tag)}" data-route-query="${escapeHtml(path.query)}">
+            ${escapeHtml(path.label)}
+            <span>${escapeHtml(path.hint)}</span>
+        </button>
+    `).join('');
+
+    const featuredItems = PRODUCT_CATALOG
+        .filter((product) => Number.isFinite(product.featuredRank) && product.featuredRank < 900)
+        .sort((a, b) => a.featuredRank - b.featuredRank)
+        .slice(0, 6);
+
+    featuredGrid.innerHTML = featuredItems.map((product) => `
+        <a class="featured-link" role="listitem" href="${escapeHtml(product.href)}">
+            <strong>${escapeHtml(product.title)}</strong>
+            <span>${escapeHtml(product.audience)} · ${escapeHtml(product.outcome)}</span>
+        </a>
+    `).join('');
+
+    taxonomyGrid.addEventListener('click', (event) => {
+        const tagButton = event.target.closest('[data-taxonomy-tag]');
+        if (!tagButton) return;
+        const tag = tagButton.dataset.taxonomyTag || 'all';
+        applySuiteRoute({ tag, query: '' });
+    });
+
+    quickstartGrid.addEventListener('click', (event) => {
+        const routeButton = event.target.closest('[data-route-tag]');
+        if (!routeButton) return;
+        applySuiteRoute({
+            tag: routeButton.dataset.routeTag || 'all',
+            query: routeButton.dataset.routeQuery || ''
+        });
+    });
+
+    if (heroLaunchButton && sageOsButton) {
+        heroLaunchButton.addEventListener('click', () => {
+            sageOsButton.click();
+        });
+    }
+})();
+
+// 13. Optional ambient background audio
 (function initAmbientAudio() {
     const toggle = document.getElementById('audio-toggle');
     const icon = toggle ? toggle.querySelector('.audio-icon') : null;
