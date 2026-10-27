@@ -1,0 +1,212 @@
+:root {
+    --bg: #040916;
+    --panel: rgba(12, 22, 38, 0.94);
+    --line: rgba(125, 211, 252, 0.26);
+    --text: #e2e8f0;
+    --muted: #9db5d2;
+    --accent: #38bdf8;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background: radial-gradient(circle at 18% 16%, rgba(56, 189, 248, 0.24), transparent 40%), var(--bg);
+}
+
+.workspace-shell {
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: minmax(280px, 330px) 1fr;
+    gap: 1rem;
+    padding: 1rem;
+}
+
+.workspace-sidebar,
+.workspace-main {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--panel);
+    backdrop-filter: blur(8px);
+}
+
+.workspace-sidebar {
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+}
+
+.workspace-kicker {
+    margin: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.72rem;
+    color: var(--accent);
+}
+
+.workspace-sidebar h1 {
+    margin: 0;
+    font-size: 1.35rem;
+    letter-spacing: -0.02em;
+}
+
+.workspace-meta {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.88rem;
+}
+
+.workspace-section h2 {
+    margin: 0 0 0.65rem;
+    font-size: 0.95rem;
+}
+
+.product-picker {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 56vh;
+    overflow: auto;
+    padding-right: 0.2rem;
+}
+
+.picker-item {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 0.45rem 0.52rem;
+    background: rgba(8, 16, 29, 0.85);
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 0.55rem;
+    cursor: pointer;
+}
+
+.picker-item input {
+    margin: 0;
+}
+
+.picker-item strong {
+    font-size: 0.84rem;
+}
+
+.picker-item span {
+    font-size: 1rem;
+}
+
+.workspace-actions {
+    margin-top: auto;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.55rem;
+}
+
+.workspace-actions button {
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: rgba(56, 189, 248, 0.12);
+    color: var(--text);
+    padding: 0.54rem 0.65rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.workspace-actions button:hover {
+    background: rgba(56, 189, 248, 0.24);
+}
+
+.workspace-main {
+    padding: 0.8rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+}
+
+.workspace-hint {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.86rem;
+}
+
+.desktop-viewport {
+    flex: 1;
+    min-height: 72vh;
+    overflow: auto;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: linear-gradient(160deg, rgba(8, 15, 28, 0.95), rgba(4, 10, 20, 0.97));
+}
+
+.desktop-canvas {
+    width: 2400px;
+    height: 1600px;
+    position: relative;
+    background-image:
+        linear-gradient(rgba(125, 211, 252, 0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(125, 211, 252, 0.08) 1px, transparent 1px);
+    background-size: 64px 64px;
+}
+
+.workspace-icon {
+    position: absolute;
+    width: 120px;
+    border-radius: 12px;
+    border: 1px solid rgba(125, 211, 252, 0.34);
+    background: rgba(7, 14, 26, 0.94);
+    color: var(--text);
+    padding: 0.45rem;
+    text-align: center;
+    cursor: grab;
+    user-select: none;
+}
+
+.workspace-icon:active {
+    cursor: grabbing;
+}
+
+.workspace-icon .emoji {
+    display: block;
+    font-size: 1.35rem;
+    margin-bottom: 0.25rem;
+}
+
+.workspace-icon .name {
+    font-size: 0.75rem;
+    line-height: 1.3;
+}
+
+.workspace-icon button {
+    margin-top: 0.35rem;
+    width: 100%;
+    border: none;
+    border-radius: 999px;
+    background: rgba(56, 189, 248, 0.18);
+    color: var(--text);
+    padding: 0.22rem 0.35rem;
+    font-size: 0.68rem;
+    cursor: pointer;
+}
+
+.workspace-icon button:hover {
+    background: rgba(56, 189, 248, 0.35);
+}
+
+@media (max-width: 980px) {
+    .workspace-shell {
+        grid-template-columns: 1fr;
+    }
+
+    .product-picker {
+        max-height: 34vh;
+    }
+
+    .desktop-viewport {
+        min-height: 66vh;
+    }
+}

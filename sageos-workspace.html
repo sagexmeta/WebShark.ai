@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; object-src 'none'; base-uri 'self'; form-action 'self';">
+    <title>SageOS Workspace Desktop</title>
+    <link rel="stylesheet" href="sageos-workspace.css">
+</head>
+<body>
+    <main class="workspace-shell">
+        <aside class="workspace-sidebar">
+            <p class="workspace-kicker">SageOS Desktop</p>
+            <h1 id="workspace-title">Workspace</h1>
+            <p id="workspace-meta" class="workspace-meta"></p>
+
+            <section class="workspace-section" aria-labelledby="picker-title">
+                <h2 id="picker-title">Add WebShark products</h2>
+                <div id="product-picker" class="product-picker"></div>
+            </section>
+
+            <section class="workspace-section workspace-actions">
+                <button type="button" id="save-workspace">Save layout</button>
+                <button type="button" id="reset-workspace">Reset layout</button>
+            </section>
+        </aside>
+
+        <section class="workspace-main">
+            <p class="workspace-hint">Drag app icons around this desktop. Click an icon to open the product.</p>
+            <div class="desktop-viewport">
+                <div id="desktop-canvas" class="desktop-canvas" role="application" aria-label="Customizable SageOS workspace desktop"></div>
+            </div>
+        </section>
+    </main>
+
+    <script src="sageos-workspace.js"></script>
+</body>
+</html>

@@ -92,6 +92,17 @@ function escapeHtml(text) {
 
     title.textContent = `Launching ${initialRole} workspace...`;
     subtitle.textContent = `Preparing persona runtime for ${user}.`;
+    let autoOpenedWorkspace = false;
+
+    function openWorkspaceWindow(instance) {
+        if (!instance) return;
+        const launchUrl = new URL('sageos-workspace.html', window.location.href);
+        launchUrl.searchParams.set('user', user);
+        launchUrl.searchParams.set('role', instance.role || desktopRole.value || initialRole);
+        launchUrl.searchParams.set('instance', instance.name || initialInstance);
+        launchUrl.searchParams.set('instanceId', instance.id || selectedInstanceId || initialInstanceId);
+        window.open(launchUrl.toString(), '_blank', 'noopener');
+    }
 
     const baseLogLines = [
         'Validating access token envelope...',
@@ -240,6 +251,8 @@ function escapeHtml(text) {
         if (!button) return;
         selectedInstanceId = button.dataset.id || '';
         renderInstances();
+        const selected = getSelected(getInstances());
+        openWorkspaceWindow(selected);
     });
 
     newButton.addEventListener('click', createInstance);
@@ -307,6 +320,11 @@ function escapeHtml(text) {
                     desktopScreen.classList.add('is-visible');
                 });
                 document.body.classList.remove('flash');
+                if (!autoOpenedWorkspace) {
+                    autoOpenedWorkspace = true;
+                    const selected = getSelected(getInstances());
+                    openWorkspaceWindow(selected);
+                }
             }, 860);
         }, 280);
     }, 95);
