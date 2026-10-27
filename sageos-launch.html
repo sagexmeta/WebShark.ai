@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; object-src 'none'; base-uri 'self'; form-action 'self';">
+    <title>SageOS Launch Console</title>
+    <link rel="stylesheet" href="sageos-launch.css">
+</head>
+<body>
+    <div id="flash-screen" aria-hidden="true"></div>
+
+    <main class="sageos-launch-shell">
+        <section id="boot-screen" class="boot-screen" aria-live="polite">
+            <p class="boot-kicker">SageOS Runtime</p>
+            <h1 id="boot-title">Launching workspace...</h1>
+            <p id="boot-subtitle" class="boot-subtitle"></p>
+            <div class="progress-wrap" role="status" aria-label="Workspace load progress">
+                <div class="progress-track">
+                    <div id="progress-fill" class="progress-fill"></div>
+                </div>
+                <span id="progress-label" class="progress-label">0%</span>
+            </div>
+            <div id="boot-log" class="boot-log" aria-label="Real-time launch status log"></div>
+        </section>
+
+        <section id="desktop-screen" class="desktop-screen" hidden>
+            <header class="desktop-topbar">
+                <div>
+                    <p class="desktop-kicker">SageOS Workspace</p>
+                    <h2 id="desktop-title">Workspace ready</h2>
+                    <p id="desktop-meta" class="desktop-meta"></p>
+                </div>
+                <div class="desktop-role-wrap">
+                    <label for="desktop-role">SageOS flavor</label>
+                    <select id="desktop-role">
+                        <option value="Executive Strategist">Executive Strategist</option>
+                        <option value="Product Builder">Product Builder</option>
+                        <option value="Data Scientist">Data Scientist</option>
+                        <option value="Security Analyst">Security Analyst</option>
+                        <option value="Operations Lead">Operations Lead</option>
+                        <option value="Research Director">Research Director</option>
+                    </select>
+                </div>
+            </header>
+
+            <section class="desktop-controls">
+                <button type="button" id="desktop-new">New instance</button>
+                <button type="button" id="desktop-duplicate">Duplicate</button>
+                <button type="button" id="desktop-save">Save</button>
+                <button type="button" id="desktop-delete">Delete</button>
+            </section>
+
+            <section class="desktop-instances-wrap">
+                <h3>Workspace instances</h3>
+                <p id="desktop-active-note" class="desktop-active-note"></p>
+                <div id="desktop-instances" class="desktop-instances"></div>
+            </section>
+        </section>
+    </main>
+
+    <script src="sageos-launch.js"></script>
+</body>
+</html>

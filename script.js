@@ -1,7 +1,10 @@
 const STORAGE_KEYS = {
     audioUnmuted: 'webshark-audio-unmuted',
     sharkboard: 'sharkboard-posts-v1',
-    feedback: 'webshark-feedback-v1'
+    feedback: 'webshark-feedback-v1',
+    sageosUsers: 'sageos-users-v1',
+    sageosSession: 'sageos-session-v1',
+    sageosInstances: 'sageos-instances-v1'
 };
 
 const LEGACY_STORAGE_KEYS = {
@@ -1486,7 +1489,463 @@ document.querySelectorAll('.shimmer-word').forEach((shimmerElement) => {
     });
 })();
 
-// 17. Keyboard shortcuts overlay
+// 17. SageOS management panel
+(function initSageOSPanel() {
+    const openButton = document.getElementById('sageos-open');
+    const panel = document.getElementById('sageos-panel');
+    const closeButton = document.getElementById('sageos-close');
+    const authStep = document.getElementById('sageos-auth-step');
+    const managerStep = document.getElementById('sageos-manager-step');
+    const usernameInput = document.getElementById('sageos-username');
+    const passwordInput = document.getElementById('sageos-password');
+    const loginButton = document.getElementById('sageos-login');
+    const createButton = document.getElementById('sageos-create');
+    const logoutButton = document.getElementById('sageos-logout');
+    const welcome = document.getElementById('sageos-welcome');
+    const roleSelect = document.getElementById('sageos-role');
+    const instanceNameInput = document.getElementById('sageos-instance-name');
+    const newInstanceButton = document.getElementById('sageos-new-instance');
+    const duplicateInstanceButton = document.getElementById('sageos-duplicate-instance');
+    const saveInstanceButton = document.getElementById('sageos-save-instance');
+    const deleteInstanceButton = document.getElementById('sageos-delete-instance');
+    const activeInstanceText = document.getElementById('sageos-active-instance');
+    const instanceList = document.getElementById('sageos-instance-list');
+    const launchButton = document.getElementById('sageos-launch');
+
+    if (
+        !openButton
+        || !panel
+        || !closeButton
+        || !authStep
+        || !managerStep
+        || !usernameInput
+        || !passwordInput
+        || !loginButton
+        || !createButton
+        || !logoutButton
+        || !welcome
+        || !roleSelect
+        || !instanceNameInput
+        || !newInstanceButton
+        || !duplicateInstanceButton
+        || !saveInstanceButton
+        || !deleteInstanceButton
+        || !activeInstanceText
+        || !instanceList
+        || !launchButton
+    ) {
+        return;
+    }
+
+    let lastFocusedElement = null;
+    let currentUser = '';
+    let selectedInstanceId = '';
+
+    const trap = createFocusTrap(panel, {
+        initialFocus: () => (managerStep.hidden ? usernameInput : roleSelect),
+        onEscape: () => closePanel()
+    });
+
+    function normalizeUsername(value) {
+        return (value || '').trim().slice(0, 32);
+    }
+
+    function normalizePassword(value) {
+        return (value || '').trim().slice(0, 64);
+    }
+
+    function createInstanceId() {
+        if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+            return crypto.randomUUID();
+        }
+        return `${Date.now()}-${Math.floor(Math.random() * 1e7)}`;
+    }
+
+    function readUsers() {
+        const users = safeReadJSON(STORAGE_KEYS.sageosUsers);
+        return users && typeof users === 'object' && !Array.isArray(users) ? users : {};
+    }
+
+    function writeUsers(nextUsers) {
+        safeWriteStorage(STORAGE_KEYS.sageosUsers, JSON.stringify(nextUsers));
+    }
+
+    function readAllInstances() {
+        const payload = safeReadJSON(STORAGE_KEYS.sageosInstances);
+        return payload && typeof payload === 'object' && !Array.isArray(payload) ? payload : {};
+    }
+
+    function writeAllInstances(nextPayload) {
+        safeWriteStorage(STORAGE_KEYS.sageosInstances, JSON.stringify(nextPayload));
+    }
+
+    function getUserInstances() {
+        if (!currentUser) return [];
+        const all = readAllInstances();
+        const raw = Array.isArray(all[currentUser]) ? all[currentUser] : [];
+        return raw
+            .map((item, index) => normalizeInstance(item, index))
+            .filter(Boolean);
+    }
+
+    function setUserInstances(instances) {
+        if (!currentUser) return;
+        const all = readAllInstances();
+        all[currentUser] = instances.slice(0, 100);
+        writeAllInstances(all);
+    }
+
+    function normalizeInstance(rawInstance, index) {
+        if (!rawInstance || typeof rawInstance !== 'object') return null;
+        const role = typeof rawInstance.role === 'string' && rawInstance.role.trim()
+            ? rawInstance.role.trim().slice(0, 60)
+            : roleSelect.value;
+        const name = typeof rawInstance.name === 'string' && rawInstance.name.trim()
+            ? rawInstance.name.trim().slice(0, 60)
+            : `${role} Workspace ${index + 1}`;
+
+        return {
+            id: typeof rawInstance.id === 'string' && rawInstance.id.trim()
+                ? rawInstance.id.trim()
+                : createInstanceId(),
+            name,
+            role,
+            status: typeof rawInstance.status === 'string' && rawInstance.status.trim()
+                ? rawInstance.status.trim().slice(0, 16)
+                : 'active',
+            createdAt: typeof rawInstance.createdAt === 'string' && rawInstance.createdAt.trim()
+                ? rawInstance.createdAt.trim()
+                : new Date().toLocaleString(),
+            savedAt: typeof rawInstance.savedAt === 'string' ? rawInstance.savedAt.trim().slice(0, 60) : ''
+        };
+    }
+
+    function readSession() {
+        const session = safeReadJSON(STORAGE_KEYS.sageosSession);
+        if (!session || typeof session !== 'object') return null;
+        const username = normalizeUsername(session.username);
+        return username ? { username } : null;
+    }
+
+    function writeSession(username) {
+        safeWriteStorage(STORAGE_KEYS.sageosSession, JSON.stringify({ username }));
+    }
+
+    function clearSession() {
+        safeRemoveStorage(STORAGE_KEYS.sageosSession);
+    }
+
+    function setStep(step) {
+        const managerMode = step === 'manager';
+        authStep.hidden = managerMode;
+        managerStep.hidden = !managerMode;
+        if (managerMode) {
+            welcome.textContent = `Logged in as ${currentUser}. Select a role flavor and manage your workspace instances.`;
+            renderInstances();
+        } else {
+            passwordInput.value = '';
+            selectedInstanceId = '';
+        }
+    }
+
+    function getSelectedInstance(instances) {
+        return instances.find((instance) => instance.id === selectedInstanceId) || null;
+    }
+
+    function setButtonsEnabled(isEnabled) {
+        duplicateInstanceButton.disabled = !isEnabled;
+        saveInstanceButton.disabled = !isEnabled;
+        deleteInstanceButton.disabled = !isEnabled;
+    }
+
+    function renderInstances() {
+        const instances = getUserInstances();
+
+        if (instances.length === 0) {
+            selectedInstanceId = '';
+            activeInstanceText.textContent = 'No active workspace instance yet.';
+            instanceList.innerHTML = '<p class="sageos-empty">No instances yet. Create one to get started.</p>';
+            setButtonsEnabled(false);
+            return;
+        }
+
+        if (!instances.some((instance) => instance.id === selectedInstanceId)) {
+            selectedInstanceId = instances[0].id;
+        }
+
+        const selected = getSelectedInstance(instances);
+        if (selected) {
+            roleSelect.value = selected.role;
+            activeInstanceText.textContent = selected.savedAt
+                ? `${selected.name} · ${selected.role} · saved ${selected.savedAt}`
+                : `${selected.name} · ${selected.role} · ${selected.status}`;
+        } else {
+            activeInstanceText.textContent = 'No active workspace instance yet.';
+        }
+
+        instanceList.innerHTML = instances.map((instance) => `
+            <button type="button" class="sageos-instance-item ${instance.id === selectedInstanceId ? 'is-active' : ''}" data-instance-id="${escapeHtml(instance.id)}">
+                <strong>${escapeHtml(instance.name)}</strong>
+                <span>${escapeHtml(instance.role)}</span>
+            </button>
+        `).join('');
+
+        setButtonsEnabled(Boolean(selected));
+    }
+
+    function buildInstanceName(role, instancesLength) {
+        const candidate = instanceNameInput.value.trim();
+        if (candidate) return candidate.slice(0, 60);
+        return `${role} Workspace ${instancesLength + 1}`;
+    }
+
+    function createNewInstance() {
+        if (!currentUser) return;
+        const role = roleSelect.value;
+        const instances = getUserInstances();
+        const nextInstance = {
+            id: createInstanceId(),
+            name: buildInstanceName(role, instances.length),
+            role,
+            status: 'active',
+            createdAt: new Date().toLocaleString(),
+            savedAt: ''
+        };
+        instances.unshift(nextInstance);
+        selectedInstanceId = nextInstance.id;
+        setUserInstances(instances);
+        renderInstances();
+        announceStatus('New SageOS workspace instance created.');
+    }
+
+    function duplicateSelectedInstance() {
+        const instances = getUserInstances();
+        const source = getSelectedInstance(instances);
+        if (!source) {
+            announceStatus('Select an instance to duplicate.');
+            return;
+        }
+
+        const copy = {
+            ...source,
+            id: createInstanceId(),
+            name: `${source.name} Copy`.slice(0, 60),
+            status: 'active',
+            createdAt: new Date().toLocaleString(),
+            savedAt: ''
+        };
+        instances.unshift(copy);
+        selectedInstanceId = copy.id;
+        setUserInstances(instances);
+        renderInstances();
+        announceStatus('Workspace instance duplicated.');
+    }
+
+    function saveSelectedInstance() {
+        const instances = getUserInstances();
+        const selected = getSelectedInstance(instances);
+        if (!selected) {
+            announceStatus('Select an instance to save.');
+            return;
+        }
+
+        selected.savedAt = new Date().toLocaleString();
+        selected.status = 'saved';
+        setUserInstances(instances);
+        renderInstances();
+        announceStatus('Workspace instance saved.');
+    }
+
+    function deleteSelectedInstance() {
+        const instances = getUserInstances();
+        const index = instances.findIndex((instance) => instance.id === selectedInstanceId);
+        if (index === -1) {
+            announceStatus('Select an instance to delete.');
+            return;
+        }
+
+        instances.splice(index, 1);
+        selectedInstanceId = instances[0]?.id || '';
+        setUserInstances(instances);
+        renderInstances();
+        announceStatus('Workspace instance deleted.');
+    }
+
+    function setCurrentUser(username) {
+        currentUser = username;
+        writeSession(username);
+        setStep('manager');
+    }
+
+    function loginOrCreate(action) {
+        const username = normalizeUsername(usernameInput.value);
+        const password = normalizePassword(passwordInput.value);
+        const users = readUsers();
+
+        if (!username) {
+            usernameInput.focus();
+            announceStatus('Enter a username first.');
+            return;
+        }
+
+        if (password.length < 4) {
+            passwordInput.focus();
+            announceStatus('Use at least 4 characters for your password.');
+            return;
+        }
+
+        if (action === 'create') {
+            if (users[username]) {
+                announceStatus('That username already exists. Try logging in.');
+                return;
+            }
+            users[username] = password;
+            writeUsers(users);
+            setCurrentUser(username);
+            announceStatus('SageOS account created and logged in.');
+            return;
+        }
+
+        if (!users[username] || users[username] !== password) {
+            announceStatus('Invalid username or password.');
+            return;
+        }
+
+        setCurrentUser(username);
+        announceStatus('Logged in to SageOS.');
+    }
+
+    function launchSageOS() {
+        if (!currentUser) {
+            announceStatus('Log in first to launch SageOS.');
+            return;
+        }
+
+        let instances = getUserInstances();
+        if (instances.length === 0) {
+            createNewInstance();
+            instances = getUserInstances();
+        }
+
+        const selected = getSelectedInstance(instances);
+        const role = selected?.role || roleSelect.value;
+        const instanceName = selected?.name || `${role} Workspace`;
+        const instanceId = selected?.id || createInstanceId();
+        const launchUrl = new URL('sageos-launch.html', window.location.href);
+        launchUrl.searchParams.set('user', currentUser);
+        launchUrl.searchParams.set('role', role);
+        launchUrl.searchParams.set('instance', instanceName);
+        launchUrl.searchParams.set('instanceId', instanceId);
+        window.open(launchUrl.toString(), '_blank', 'noopener');
+        announceStatus('Launching SageOS workspace.');
+    }
+
+    function openPanel() {
+        lastFocusedElement = document.activeElement;
+        panel.hidden = false;
+        document.body.classList.add('panel-open');
+        openButton.setAttribute('aria-expanded', 'true');
+        trap.activate();
+        announceStatus('SageOS panel opened.');
+    }
+
+    function closePanel({ returnFocus = true } = {}) {
+        if (panel.hidden) return;
+        panel.hidden = true;
+        document.body.classList.remove('panel-open');
+        openButton.setAttribute('aria-expanded', 'false');
+        trap.deactivate();
+
+        if (returnFocus) {
+            const focusTarget = lastFocusedElement && typeof lastFocusedElement.focus === 'function'
+                ? lastFocusedElement
+                : openButton;
+            focusTarget.focus();
+        }
+
+        announceStatus('SageOS panel closed.');
+    }
+
+    openButton.addEventListener('click', () => {
+        if (panel.hidden) {
+            openPanel();
+            return;
+        }
+        closePanel({ returnFocus: false });
+    });
+
+    closeButton.addEventListener('click', () => {
+        closePanel();
+    });
+
+    document.addEventListener('mousedown', (event) => {
+        if (panel.hidden) return;
+        if (panel.contains(event.target) || openButton.contains(event.target)) return;
+        closePanel({ returnFocus: false });
+    });
+
+    loginButton.addEventListener('click', () => {
+        loginOrCreate('login');
+    });
+
+    createButton.addEventListener('click', () => {
+        loginOrCreate('create');
+    });
+
+    passwordInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            loginOrCreate('login');
+        }
+    });
+
+    logoutButton.addEventListener('click', () => {
+        clearSession();
+        currentUser = '';
+        selectedInstanceId = '';
+        usernameInput.value = '';
+        passwordInput.value = '';
+        setStep('auth');
+        usernameInput.focus();
+        announceStatus('Logged out of SageOS.');
+    });
+
+    newInstanceButton.addEventListener('click', createNewInstance);
+    duplicateInstanceButton.addEventListener('click', duplicateSelectedInstance);
+    saveInstanceButton.addEventListener('click', saveSelectedInstance);
+    deleteInstanceButton.addEventListener('click', deleteSelectedInstance);
+    launchButton.addEventListener('click', launchSageOS);
+
+    roleSelect.addEventListener('change', () => {
+        const instances = getUserInstances();
+        const selected = getSelectedInstance(instances);
+        if (!selected) return;
+        selected.role = roleSelect.value;
+        selected.status = 'active';
+        setUserInstances(instances);
+        renderInstances();
+    });
+
+    instanceList.addEventListener('click', (event) => {
+        const item = event.target.closest('.sageos-instance-item');
+        if (!item) return;
+        selectedInstanceId = item.dataset.instanceId || '';
+        renderInstances();
+    });
+
+    const initialSession = readSession();
+    const users = readUsers();
+    if (initialSession?.username && users[initialSession.username]) {
+        currentUser = initialSession.username;
+        setStep('manager');
+    } else {
+        setStep('auth');
+    }
+
+    openButton.setAttribute('aria-expanded', 'false');
+})();
+
+// 18. Keyboard shortcuts overlay
 (function initKeyboardShortcuts() {
     const overlay = document.getElementById('shortcuts-overlay');
     const closeButton = document.getElementById('shortcuts-close');

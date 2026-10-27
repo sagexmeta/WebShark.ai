@@ -24,9 +24,7 @@
                 <span class="visitor-counter-label">Visitors</span>
                 <span id="visitor-count">Loading…</span>
             </p>
-            <nav>
-                <a href="mailto:samreedcole7@gmail.com">Contact</a>
-            </nav>
+            <button type="button" id="sageos-open" class="about-btn" aria-haspopup="dialog" aria-controls="sageos-panel" aria-expanded="false">SageOS</button>
             <a href="about.html" class="about-btn">About</a>
         </div>
     </header>
@@ -297,6 +295,65 @@
                     <p class="sharkboard-empty">No posts yet. Be the first to share! 🎨</p>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <div id="sageos-panel" class="sageos-panel" role="dialog" aria-modal="true" aria-labelledby="sageos-title" aria-describedby="sageos-description" hidden>
+        <div class="sageos-header">
+            <h2 id="sageos-title">SageOS Management</h2>
+            <p class="sageos-subtitle" id="sageos-description">Log in, pick your role, and launch a matching SageOS workspace.</p>
+            <button type="button" class="sageos-close" id="sageos-close" aria-label="Close SageOS panel">×</button>
+        </div>
+
+        <div class="sageos-content">
+            <section id="sageos-auth-step" class="sageos-section" aria-labelledby="sageos-auth-title">
+                <h3 id="sageos-auth-title">Sign in or create account</h3>
+                <p class="sageos-copy">Use a local profile in this browser to manage SageOS workspace instances.</p>
+                <div class="sageos-field">
+                    <label for="sageos-username">Username</label>
+                    <input type="text" id="sageos-username" class="sageos-input" autocomplete="username" maxlength="32" placeholder="Choose your username">
+                </div>
+                <div class="sageos-field">
+                    <label for="sageos-password">Password</label>
+                    <input type="password" id="sageos-password" class="sageos-input" autocomplete="current-password" maxlength="64" placeholder="Enter your password">
+                </div>
+                <div class="sageos-auth-actions">
+                    <button type="button" id="sageos-login" class="sageos-primary">Log in</button>
+                    <button type="button" id="sageos-create" class="sageos-secondary">Create account</button>
+                </div>
+            </section>
+
+            <section id="sageos-manager-step" class="sageos-section" aria-labelledby="sageos-manager-title" hidden>
+                <div class="sageos-session-row">
+                    <h3 id="sageos-manager-title">Workspace control panel</h3>
+                    <button type="button" id="sageos-logout" class="sageos-link">Log out</button>
+                </div>
+                <p class="sageos-copy" id="sageos-welcome"></p>
+                <div class="sageos-field">
+                    <label for="sageos-role">SageOS role flavor</label>
+                    <select id="sageos-role" class="sageos-select">
+                        <option value="Executive Strategist">Executive Strategist</option>
+                        <option value="Product Builder">Product Builder</option>
+                        <option value="Data Scientist">Data Scientist</option>
+                        <option value="Security Analyst">Security Analyst</option>
+                        <option value="Operations Lead">Operations Lead</option>
+                        <option value="Research Director">Research Director</option>
+                    </select>
+                </div>
+                <div class="sageos-field">
+                    <label for="sageos-instance-name">Workspace instance name</label>
+                    <input type="text" id="sageos-instance-name" class="sageos-input" maxlength="60" placeholder="Optional custom name">
+                </div>
+                <div class="sageos-instance-actions">
+                    <button type="button" id="sageos-new-instance" class="sageos-secondary">Create new</button>
+                    <button type="button" id="sageos-duplicate-instance" class="sageos-secondary">Duplicate</button>
+                    <button type="button" id="sageos-save-instance" class="sageos-secondary">Save</button>
+                    <button type="button" id="sageos-delete-instance" class="sageos-secondary">Delete</button>
+                </div>
+                <p class="sageos-copy" id="sageos-active-instance">No active workspace instance yet.</p>
+                <div id="sageos-instance-list" class="sageos-instance-list"></div>
+                <button type="button" id="sageos-launch" class="sageos-primary sageos-launch">Launch SageOS</button>
+            </section>
         </div>
     </div>
 
